@@ -1,7 +1,7 @@
 # Extend vert.x base image
 FROM vertx/vertx3
 
-ENV VERTICLE_JAR hello-world-1.0-SNAPSHOT-fat.jar
+ENV VERTICLE_JAR hello-world-fat.jar
 ENV VERTICLE_HOME verticles
 
 EXPOSE 8080
