@@ -78,6 +78,7 @@ public class HelloVerticle extends AbstractVerticle {
         readingList.put(article1.getId(), article1);
         Article article2 = new Article("Reactive Manifesto", "https://www.reactivemanifesto.org/");
         readingList.put(article2.getId(), article2);
+        System.out.println("LOGGING TEEEESST");
     }
 
     private void getAll(RoutingContext routingContext) {

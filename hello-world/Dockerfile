@@ -1,15 +1,18 @@
 # Extend vert.x base image
 FROM vertx/vertx3
 
-ENV VERTICLE_JAR hello-world-1.0-SNAPSHOT-fat.jar
-ENV VERTICLE_HOME verticles
+ENV VERTICLE_NAME helloworld.HelloVerticle
+ENV VERTICLE_FILE target/hello-world-1.0-SNAPSHOT.jar
+
+ENV VERTICLE_HOME /usr/verticles
 
 EXPOSE 8080
 
 # Copy the jar file into a container folder
-COPY $VERTICLE_JAR $VERTICLE_HOME/
+COPY $VERTICLE_FILE $VERTICLE_HOME/
 
-WORKDIR .
+#Launch
+WORKDIR $VERTICLE_HOME
 
-# Launch the verticle using 'java -jar verticles/hello-world-1.0-SNAPSHOT' command
-ENTRYPOINT ["sh", "-c","java -jar $VERTICLE_HOME/$VERTICLE_JAR"]
+ENTRYPOINT ["sh", "-c"]
+CMD ["exec vertx run $VERTICLE_NAME -cp $VERTICLE_HOME/*"]
