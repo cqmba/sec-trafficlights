@@ -2,7 +2,7 @@
 FROM vertx/vertx3
 
 ENV VERTICLE_NAME helloworld.HelloVerticle
-ENV VERTICLE_FILE target/hello-world-1.0-SNAPSHOT.jar
+ENV VERTICLE_FILE target/hello-world-1.0-SNAPSHOT-fat.jar
 
 ENV VERTICLE_HOME /usr/verticles
 

@@ -11,10 +11,16 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class HelloVerticle extends AbstractVerticle {
+	
+	// Logging
+	private final Logger LOGGER = LoggerFactory.getLogger( HelloVerticle.class );
 
     // Store our readingList
     private Map<Integer, Article> readingList = new LinkedHashMap<>();
@@ -79,6 +85,9 @@ public class HelloVerticle extends AbstractVerticle {
         Article article2 = new Article("Reactive Manifesto", "https://www.reactivemanifesto.org/");
         readingList.put(article2.getId(), article2);
         System.out.println("LOGGING TEEEESST");
+        LOGGER.info("JAAAAR HAR LOGGIDIDII");
+        LOGGER.warn("Doing a loogin is always op");
+        LOGGER.error("You are a Logger");
     }
 
     private void getAll(RoutingContext routingContext) {
