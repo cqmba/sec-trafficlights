@@ -6,17 +6,25 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import {MatTableModule} from '@angular/material/table';
 import { FlexLayoutModule } from '@angular/flex-layout';
 import {MatChipsModule} from '@angular/material/chips';
+import { DetailviewComponent } from './detailview/detailview.component';
+import { OverviewComponent } from './overview/overview.component';
+import { FooterComponent } from './footer/footer.component';
+import { AppRoutingModule } from './app-routing/app-routing.module';
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    DetailviewComponent,
+    OverviewComponent,
+    FooterComponent
   ],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
     MatTableModule,
     FlexLayoutModule,
-    MatChipsModule
+    MatChipsModule,
+    AppRoutingModule,
   ],
   providers: [],
   bootstrap: [AppComponent]
