@@ -1,1 +1,82 @@
-<p>detailview works!</p>
+<h1> Detail View </h1>
+<button mat-button id="back" routerLink="/">Go Back</button>
+<div id="top">
+<mat-card id="schedule">
+  <h2> Schedule </h2>
+  <div class="schedule_entry">
+    <div class="schedule_label schedule_item"> Test </div>
+    <div class="schedule_input">
+    <mat-form-field class="schedule_item">
+      <input matInput  class="schedule_input" placeholder="Please enter a value" />
+    </mat-form-field>
+    </div>
+    <div class="schedule_input">
+    <mat-form-field class="schedule_item">
+      <mat-select class="schedule_input" placeholder="Select target State">
+        <mat-option value="option">Test</mat-option>
+      </mat-select>
+    </mat-form-field>
+    </div>
+  </div>
+  <div id="button-pannel">
+    <button mat-button> Reset </button>
+    <button mat-raised-button color="primary"> Apply </button>
+  </div>
+</mat-card>
+<div id="right">
+<mat-card id="overview">
+  <h2> Overview </h2>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Name: </p>
+    <p class="overview_entry_item"> Test </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Group: </p>
+    <p class="overview_entry_item"> Test </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Last Seen: </p>
+    <p class="overview_entry_item"> Test </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Mode: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip>Test</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> State: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip>Test</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Health: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip>Test</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+     <mat-slide-toggle>Maintenance Mode</mat-slide-toggle>
+  </div>
+</mat-card>
+<mat-card id="state_control">
+  <h2>Manual state change</h2>
+  <mat-form-field>
+    <input matInput placeholder="Please enter a value" />
+  </mat-form-field>
+  <mat-form-field>
+    <mat-select placeholder="Select target State">
+      <mat-option value="option">Test</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <button mat-raised-button color="primary" id="send"> Send </button>
+</mat-card>
+</div>
+</div>
