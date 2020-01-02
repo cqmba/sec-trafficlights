@@ -9,7 +9,7 @@ const routes: Routes = [
             component: OverviewComponent,
         },
         {
-          path: 'detail',
+          path: 'light/:id',
           component: DetailviewComponent,
         }
     ];
