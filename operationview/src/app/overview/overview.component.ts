@@ -1,28 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-
-
-export interface TrafficLights {
-  name: string;
-  currentState: string;
-  mode: string;
-  lastSeen: string;
-}
-
-const TL_DATA: TrafficLights[] = [
-  {name: "Pedestrian_SE_FN", currentState: 'RED', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Pedestrian_SE_FW", currentState: 'REDYELLOW', mode: 'Scheduled', lastSeen: '27s'},
-  {name: "Pedestrian_SW_FN", currentState: 'GREEN', mode: 'Scheduled', lastSeen: '24s'},
-  {name: "Pedestrian_SE_FE", currentState: 'GREEN', mode: 'Assigned', lastSeen: '2m'},
-  {name: "Pedestrian_NE_FS", currentState: 'GREEN', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Pedestrian_NE_FW", currentState: 'GREEN', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Pedestrian_NW_FS", currentState: 'GREEN', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Pedestrian_NW_FE", currentState: 'GREEN', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Car_S", currentState: 'YELLOW', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Car_E", currentState: 'YELLOW_BLINK', mode: 'Maintenance', lastSeen: '4d'},
-  {name: "Car_N", currentState: 'YELLOW', mode: 'Scheduled', lastSeen: '15s'},
-  {name: "Car_W", currentState: 'RED_YELLOW', mode: 'Scheduled', lastSeen: '30s'},
-];
-
+import { TrafficLight } from '../model/traffic_light';
+import { Modes } from '../model/transition';
+import { OverviewDataService } from '../overview-data.service';
+import { Subscription, of as observableOf } from 'rxjs';
 
 @Component({
   selector: 'app-overview',
@@ -31,23 +11,32 @@ const TL_DATA: TrafficLights[] = [
 })
 
 export class OverviewComponent implements OnInit {
+
+  tlList : TrafficLight[];
+  dataSub : Subscription;
+
   title = 'Trafic Light Operation Overview';
-  displayedColumns: string[] = ['name', 'currentState', 'mode', 'lastSeen'];
-  dataSource = TL_DATA;
+  displayedColumns: string[] = ['id', 'currentState', 'mode', 'lastSeen'];
+  dataSource = this.tlList;
 
   getColorMode(mode : string) : string {
-    if (mode === "Maintenance"){
+    if (mode === Modes.MAINTENANCE){
       return "lightsalmon";
-    } else if (mode === "Scheduled"){
+    } else if (mode === Modes.SCHEDULED){
       return "lightblue";
-    } else if (mode === "Assigned") {
+    } else if (mode === Modes.ASSIGNED) {
       return "lightgreen";
     } else {
       return "grey";
     }
   }
 
-  constructor() { }
+  constructor( private dataService: OverviewDataService ) {
+    this.dataSub = dataService.getTLList().subscribe(tlList => {
+      this.tlList = tlList;
+    });
+
+  }
 
   ngOnInit() {
   }
