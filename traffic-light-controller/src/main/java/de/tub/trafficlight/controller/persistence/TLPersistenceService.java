@@ -20,4 +20,8 @@ public interface TLPersistenceService {
 
     public boolean updateTrafficLight(int id, TrafficLight tl);
 
+    public boolean updateTrafficLightList(List<TrafficLight> tlList);
+
+    public List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
+
 }

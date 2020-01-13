@@ -2,10 +2,7 @@ package de.tub.trafficlight.controller.persistence;
 
 import de.tub.trafficlight.controller.entity.TrafficLight;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -49,5 +46,37 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
         TrafficLight tlUpdated = tlList.replace(id, tl);
         if (tlUpdated != null) return true;
         else return false;
+    }
+
+    @Override
+    public boolean updateTrafficLightList(List<TrafficLight> tlList) {
+        //TODO handle update as a single transaction and revert possibly
+        try {
+            for (TrafficLight tl : tlList) {
+                if (!updateTrafficLight(tl.getId(), tl)) {
+                    throw new Exception("Error: Failed to update TL");
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
+    public List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList) {
+        List<TrafficLight> addedList = new ArrayList<>();
+        try {
+            for (TrafficLight tl : tlList) {
+                if (!tl.equals(addTrafficLight(tl))) {
+                    throw new Exception("Error: Failed to add TL");
+                }else {
+                    addedList.add(tl);
+                }
+            }
+            return addedList;
+        } catch (Exception e) {
+            return addedList;
+        }
     }
 }

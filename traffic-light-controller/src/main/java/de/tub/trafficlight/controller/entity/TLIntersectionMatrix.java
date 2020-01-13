@@ -5,6 +5,8 @@ import de.tub.trafficlight.controller.schedule.TLSchedule;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TLIntersectionMatrix {
 
@@ -43,6 +45,10 @@ public class TLIntersectionMatrix {
 
     private TLState state;
 
+    private List<TrafficLight> roadLights;
+    private List<TrafficLight> pedLights;
+
+
     public TLIntersectionMatrix(){
         this.state = TLState.S0_MG_SR_PM;
         this.mw_mode = TLOperationMode.ON_NORMAL;
@@ -72,6 +78,9 @@ public class TLIntersectionMatrix {
         ped4_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health, me_mode, me_schedule);
         ped4_north = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_sn, sn_health, sn_mode, sn_schedule);
 
+        pedLights = new ArrayList<>(Arrays.asList(ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_east, ped4_north));
+        roadLights= new ArrayList<>(Arrays.asList(main_west, main_east, side_north, side_south));
+        printIntersection();
     }
 
     public void doTransition(boolean isEmergencyMain, boolean isEmergencySide){
@@ -90,23 +99,25 @@ public class TLIntersectionMatrix {
         ped4_east.setColor(state.getCurrentMainPedestrianColor());
         //TODO remove this
         printIntersection();
-        System.out.println("Next transition due in "+state.nextState(false, false).getCurrentStandardTransitionTimeMs()+"ms");
     }
 
     private void printIntersection(){
-        System.out.println("New intersection State");
+        System.out.println("New intersection State " + state.toString());
         System.out.println("Road Traffic Lights: ");
-        List<TrafficLight> roadLights = new ArrayList<>();
-        roadLights.addAll(Arrays.asList(main_west, main_east, side_north, side_south));
         for (TrafficLight light : roadLights){
-            System.out.println(light.getPosition().toString() +": "+light.getColor().toString());
+            System.out.println("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
         }
         System.out.println("Pedestrian Lights: ");
-        List<TrafficLight> pedLights = new ArrayList<>();
-        pedLights.addAll(Arrays.asList(ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_east, ped4_north));
         for (TrafficLight light : pedLights){
-            System.out.println(light.getPosition().toString() +": "+light.getColor().toString());
+            System.out.println("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
         }
     }
 
+    public List<TrafficLight> getTLList(){
+        return Stream.concat(roadLights.stream(), pedLights.stream()).collect(Collectors.toList());
+    }
+
+    public int getNextTransitionTimeMs(){
+        return state.nextState(false, false).getCurrentStandardTransitionTimeMs();
+    }
 }

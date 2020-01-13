@@ -25,9 +25,32 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     private void startSchedule() {
-        vertx.setPeriodic(5000, event -> {
+        List<TrafficLight> trafficLights = intersection.getTLList();
+        try {
+            if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
+                throw new Exception("Error: Failed to initialize Intersection and TL State");
+            }
+        }catch (Exception ex){
+            //TODO handle
+        }
+        vertx.setTimer(25000, event -> {
             intersection.doTransition(false, false);
+            persistence.updateTrafficLightList(intersection.getTLList());
+            System.out.println("Waiting " + intersection.getNextTransitionTimeMs() +" ms");
+            timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
+        });
+        /*vertx.setPeriodic(5000, event -> {
+            intersection.doTransition(false, false);
+            persistence.updateTrafficLightList(intersection.getTLList());
+        });*/
+    }
 
+    private void timeNextTransition(Vertx vertx, int time){
+        vertx.setTimer(time, event -> {
+            intersection.doTransition(false, false);
+            persistence.updateTrafficLightList(intersection.getTLList());
+            System.out.println("Waiting " + intersection.getNextTransitionTimeMs() +" ms");
+            timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
     }
     
