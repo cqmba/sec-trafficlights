@@ -1,0 +1,20 @@
+{
+  "api.gateway.http.port": 8787,
+  "api.gateway.http.address": "localhost",
+  "circuit-breaker": {
+    "name": "api-gateway-cb",
+    "timeout": 10000,
+    "max-failures": 5
+  },
+  "realm": "vertx",
+  "auth-server-url": "http://127.0.0.1:38080/auth",
+  "ssl-required": "external",
+  "resource": "vertx-tlc",
+  "credentials": {
+    "secret": "40f70486-8449-473f-901d-e13eb518482b"
+  },
+  "confidential-port": 0,
+  "keystore.password" : "4mB8nqJd5YEHFkw6",
+  "keystore.path" : "src/main/resources/server_keystore.jks",
+  "truststore.path" : "src/main/resources/server_truststore.jks"
+}
