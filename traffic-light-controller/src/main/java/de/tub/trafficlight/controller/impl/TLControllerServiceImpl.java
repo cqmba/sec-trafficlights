@@ -34,15 +34,15 @@ public class TLControllerServiceImpl implements TLControllerService {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
                 throw new Exception("Error: Failed to initialize Intersection and TL State");
             }
-            logger.info("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
+            logger.debug("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
         }catch (Exception ex){
             //TODO handle
         }
         vertx.setTimer(25000, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            logger.info("Transition: New intersection state " + intersection.getCurrentIntersectionState());
-            logger.info("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
+            logger.debug("Transition: New intersection state " + intersection.getCurrentIntersectionState());
+            logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
     }
@@ -51,8 +51,8 @@ public class TLControllerServiceImpl implements TLControllerService {
         vertx.setTimer(time, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            logger.info("Transition: New intersection state " + intersection.getCurrentIntersectionState());
-            logger.info("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
+            logger.debug("Transition: New intersection state " + intersection.getCurrentIntersectionState());
+            logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
     }
@@ -108,8 +108,8 @@ public class TLControllerServiceImpl implements TLControllerService {
                 //TODO wait out current timer and inject into following
                 if(tl.getPosition().equals(TLPosition.MAIN_ROAD_EAST) || tl.getPosition().equals(TLPosition.MAIN_ROAD_WEST)){
                     intersection.doTransition(true, false);
-                    logger.info("Executed Emergency Green Light for Emergency Vehicle triggered by Sensor on " + tl.getPosition().toString());
-                    logger.info("New Intersection State " + intersection.getCurrentIntersectionState());
+                    logger.debug("Executed Emergency Green Light for Emergency Vehicle triggered by Sensor on " + tl.getPosition().toString());
+                    logger.debug("New Intersection State " + intersection.getCurrentIntersectionState());
                     return true;
                 } else {
                     intersection.doTransition(false, true);

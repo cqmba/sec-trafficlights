@@ -87,14 +87,14 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     }
 
     private void printIntersection(){
-        logger.info("New intersection State " + state.toString());
-        logger.info("Road Traffic Lights: ");
+        logger.debug("New intersection State " + state.toString());
+        logger.debug("Road Traffic Lights: ");
         for (TrafficLight light : roadLights){
-            logger.info("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
+            logger.debug("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
         }
-        logger.info("Pedestrian Lights: ");
+        logger.debug("Pedestrian Lights: ");
         for (TrafficLight light : pedLights){
-            logger.info("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
+            logger.debug("("+ light.getId() + ") " + light.getPosition().toString() +": "+light.getColor().toString());
         }
     }
 

@@ -22,11 +22,6 @@
             <artifactId>microservice-common</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-auth-oauth2</artifactId>
-            <optional>true</optional>
-        </dependency>
     </dependencies>
 
     <build>
