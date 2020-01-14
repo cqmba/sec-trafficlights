@@ -14,10 +14,6 @@ export class TrafficLight {
     return this.schedule;
   }
 
-  getAvailStates() : string[] {
-
-  }
-
   constructor(id: string, group: string, last_seen: number, schedule: Transition[], state: string, health: string, mode: string, availStates: string[]) {
     this.id = id;
     this.group = group;
