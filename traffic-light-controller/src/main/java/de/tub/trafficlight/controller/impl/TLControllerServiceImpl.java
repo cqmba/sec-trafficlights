@@ -1,12 +1,14 @@
 package de.tub.trafficlight.controller.impl;
 
 import de.tub.trafficlight.controller.TLControllerService;
-import de.tub.trafficlight.controller.entity.TLIntersectionMatrix;
-import de.tub.trafficlight.controller.entity.TLPosition;
-import de.tub.trafficlight.controller.entity.TrafficLight;
+import de.tub.trafficlight.controller.entity.*;
+import de.tub.trafficlight.controller.logic.TLIntersectionLogicService;
+import de.tub.trafficlight.controller.logic.TLIntersectionLogicServiceImpl;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
 import de.tub.trafficlight.controller.persistence.TLPersistenceServiceImpl;
 import io.vertx.core.Vertx;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,12 +16,14 @@ import java.util.Optional;
 public class TLControllerServiceImpl implements TLControllerService {
 
     private TLPersistenceService persistence;
-    private TLIntersectionMatrix intersection;
+    private TLIntersectionLogicService intersection;
     private Vertx vertx;
+
+    private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
 
     public TLControllerServiceImpl(Vertx vertx){
         persistence = new TLPersistenceServiceImpl();
-        intersection = new TLIntersectionMatrix();
+        intersection = new TLIntersectionLogicServiceImpl();
         this.vertx = vertx;
         startSchedule();
     }
@@ -30,26 +34,25 @@ public class TLControllerServiceImpl implements TLControllerService {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
                 throw new Exception("Error: Failed to initialize Intersection and TL State");
             }
+            logger.info("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
         }catch (Exception ex){
             //TODO handle
         }
         vertx.setTimer(25000, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            System.out.println("Waiting " + intersection.getNextTransitionTimeMs() +" ms");
+            logger.info("Transition: New intersection state " + intersection.getCurrentIntersectionState());
+            logger.info("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
-        /*vertx.setPeriodic(5000, event -> {
-            intersection.doTransition(false, false);
-            persistence.updateTrafficLightList(intersection.getTLList());
-        });*/
     }
 
     private void timeNextTransition(Vertx vertx, int time){
         vertx.setTimer(time, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            System.out.println("Waiting " + intersection.getNextTransitionTimeMs() +" ms");
+            logger.info("Transition: New intersection state " + intersection.getCurrentIntersectionState());
+            logger.info("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
     }
@@ -84,18 +87,36 @@ public class TLControllerServiceImpl implements TLControllerService {
         return persistence.updateTrafficLight(tlId, tl);
     }
 
-    //TODO still need Helper Methods?
-    private static TLPosition fromString(String name) {
-        return getEnumFromString(TLPosition.class, name);
+    @Override
+    public TrafficLight changeColor(int tlId, TLColor color) {
+        //TODO what should this do in the backend? Calculate new fitting state or just hold the state?
+        if(persistence.getTrafficLight(tlId).isPresent()){
+            TrafficLight tl = persistence.getTrafficLight(tlId).get();
+            tl.setColor(color);
+            return persistence.getTrafficLight(tlId).get();
+        } else {
+            //TODO handle ex
+            return null;
+        }
     }
 
-    private static <T extends Enum<T>> T getEnumFromString(Class<T> c, String string) {
-        if( c != null && string != null ) {
-            try {
-                return Enum.valueOf(c, string.trim().toUpperCase());
-            } catch(IllegalArgumentException ex) {
+    @Override
+    public boolean changeToGreen(int tlId) {
+        if(getSingleTLState(tlId).isPresent()){
+            TrafficLight tl = getSingleTLState(tlId).get();
+            if (TLType.VEHICLE.equals(tl.getType())){
+                //TODO wait out current timer and inject into following
+                if(tl.getPosition().equals(TLPosition.MAIN_ROAD_EAST) || tl.getPosition().equals(TLPosition.MAIN_ROAD_WEST)){
+                    intersection.doTransition(true, false);
+                    logger.info("Executed Emergency Green Light for Emergency Vehicle triggered by Sensor on " + tl.getPosition().toString());
+                    logger.info("New Intersection State " + intersection.getCurrentIntersectionState());
+                    return true;
+                } else {
+                    intersection.doTransition(false, true);
+                    return true;
+                }
             }
         }
-        return null;
+        return false;
     }
 }

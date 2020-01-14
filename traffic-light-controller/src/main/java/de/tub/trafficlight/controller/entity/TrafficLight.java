@@ -10,8 +10,17 @@ public class TrafficLight {
     private TLColor color;
     private TLPosition position;
     private TLHealth health;
-    private TLOperationMode operation;
+    private TLMode mode;
     private TLSchedule schedule;
+    private TLType type;
+
+    public TLType getType() {
+        return type;
+    }
+
+    public void setType(TLType type) {
+        this.type = type;
+    }
 
     public TLSchedule getSchedule() {
         return schedule;
@@ -45,12 +54,12 @@ public class TrafficLight {
         this.health = health;
     }
 
-    public TLOperationMode getOperation() {
-        return operation;
+    public TLMode getMode() {
+        return mode;
     }
 
-    public void setOperation(TLOperationMode operation) {
-        this.operation = operation;
+    public void setMode(TLMode mode) {
+        this.mode = mode;
     }
 
     public  TLColor getColor() {
@@ -66,8 +75,9 @@ public class TrafficLight {
         this.color = TLColor.GREEN;
         this.position = TLPosition.MAIN_ROAD_EAST;
         this.health = TLHealth.HEALTHY;
-        this.operation = TLOperationMode.ON_NORMAL;
+        this.mode = TLMode.SCHEDULED;
         this.schedule = new TLSchedule(5000, TLColor.YELLOWRED, TLColor.GREEN);
+        this.type = TLType.VEHICLE;
     }
 
     public TrafficLight(TLPosition position) {
@@ -75,16 +85,18 @@ public class TrafficLight {
         this.color = TLColor.GREEN;
         this.position = position;
         this.health = TLHealth.HEALTHY;
-        this.operation = TLOperationMode.ON_NORMAL;
+        this.mode = TLMode.SCHEDULED;
         this.schedule = new TLSchedule(5000, TLColor.YELLOWRED, TLColor.GREEN);
+        this.type = TLType.VEHICLE;
     }
 
-    public TrafficLight(TLColor color, TLPosition position, TLHealth health, TLOperationMode operation, TLSchedule schedule) {
+    public TrafficLight(TLColor color, TLPosition position, TLHealth health, TLMode mode, TLSchedule schedule, TLType type) {
         this.id = COUNTER.getAndIncrement();
         this.color = color;
         this.position = position;
         this.health = health;
-        this.operation = operation;
+        this.mode = mode;
         this.schedule = schedule;
+        this.type = type;
     }
 }

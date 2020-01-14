@@ -8,15 +8,14 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
-import io.vertx.servicediscovery.ServiceDiscoveryOptions;
 import io.vertx.servicediscovery.types.EventBusService;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 import io.vertx.servicediscovery.types.JDBCDataSource;
 import io.vertx.servicediscovery.types.MessageSource;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +26,7 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
 
     private static final String LOG_EVENT_ADDRESS = "events.log";
 
-    private static final Logger logger = LoggerFactory.getLogger(BaseMicroserviceVerticle.class);
+    private static final Logger logger = LogManager.getLogger(BaseMicroserviceVerticle.class);
 
     protected ServiceDiscovery discovery;
     protected CircuitBreaker circuitBreaker;

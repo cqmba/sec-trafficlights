@@ -48,3 +48,10 @@ SSL (not fully working)
 
 Deployment
 * I started working on a deploy Skript (deploy.sh) that should in the end automate the whole build process from maven to docker to kubernetes, but its kinda deprecated (last updated in Mid of December) and I will update it eventually, feel free to add your own ideas to it 
+
+TODO liste
+* Keycloak/Vertx config
+* SSL certificates/Vertx SSL configuration
+* Applications need to be able to verify authorization from oAuth and log access
+* We should get the MySQL server running so that we can configure log4j to work over jdbc (Encrypted communication?)
+* Verify and test /lights backend

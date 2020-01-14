@@ -5,5 +5,5 @@ public enum TLColor {
     YELLOW,
     RED,
     YELLOWRED,
-    FLASHINGYELLOW
+    YELLOWBLINKING
 }

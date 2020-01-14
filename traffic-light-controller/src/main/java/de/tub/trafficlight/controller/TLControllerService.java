@@ -1,5 +1,6 @@
 package de.tub.trafficlight.controller;
 
+import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import de.tub.trafficlight.controller.impl.TLControllerServiceImpl;
@@ -22,4 +23,8 @@ public interface TLControllerService {
     boolean removeTL(int tlId);
 
     boolean updateTL(int tlId, TrafficLight tl);
+
+    TrafficLight changeColor(int tlId, TLColor color);
+
+    boolean changeToGreen(int tlId);
 }
