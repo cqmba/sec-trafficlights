@@ -3,6 +3,7 @@ package de.tub.apigateway;
 import de.tub.microservice.common.RestAPIVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpServerOptions;
@@ -11,18 +12,19 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
-import io.vertx.ext.auth.oauth2.KeycloakHelper;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
 import io.vertx.ext.auth.oauth2.OAuth2FlowType;
 import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.client.HttpResponse;
+import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.handler.UserSessionHandler;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
-import io.vertx.servicediscovery.types.EventBusService;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 
 import java.util.List;
@@ -37,8 +39,11 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     private OAuth2Auth oauth2;
 
     @Override
-    public void start(Future<Void> future) throws Exception {
+    public void start(Promise<Void> promise) throws Exception {
         super.start();
+        super.start(promise);
+        //TODO remove this when Discovery is working
+        mockDiscoveryEndpoints();
 
         // get HTTP host and port from configuration, or use default value
         String host = config().getString("api.gateway.http.address", "localhost");
@@ -56,41 +61,53 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
         // create OAuth 2 instance for Keycloak
         oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
+        //OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
+        //authHandler.setupCallback(router.get("/callback"));
 
-        router.route().handler(UserSessionHandler.create(oauth2));
+        //router.route().handler(UserSessionHandler.create(oauth2));
 
         String hostURI = buildHostURI();
 
         // set auth callback handler
-        router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
+        //router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
 
-        router.get("/uaa").handler(this::authUaaHandler);
-        router.get("/login").handler(this::loginEntryHandler);
-        router.post("/logout").handler(this::logoutHandler);
+        //router.route("/protected/*").handler(authHandler);
+        //router.get("/uaa").handler(this::authUaaHandler);
+        //router.get("/login").handler(this::loginEntryHandler);
+        //router.post("/logout").handler(this::logoutHandler);
 
+        router.route("/").handler(routingContext -> {
+            HttpServerResponse response = routingContext.response();
+            response
+                    .putHeader("content-type", "text/html")
+                    .end("<h1>Hello vertx</h1>");
+        });
+
+        // Serve static resources from the /assets directory
+        router.route("/assets/*").handler(StaticHandler.create("assets"));
         // api dispatcher
+        //router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
-        // static content
-        router.route("/*").handler(StaticHandler.create());
+        final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
+        final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
+        final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
-        // enable HTTPS
-        HttpServerOptions httpServerOptions = new HttpServerOptions()
-                .setSsl(true)
-                .setKeyStoreOptions(new JksOptions().setPath("server.jks").setPassword("123456"));
+        HttpServerOptions options = new HttpServerOptions()
+                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
+                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
 
-        // create http server
-        vertx.createHttpServer(httpServerOptions)
-                .requestHandler(router::accept)
+        vertx.createHttpServer(options)
+                .requestHandler(router)
                 .listen(port, host, ar -> {
                     if (ar.succeeded()) {
                         publishApiGateway(host, port);
-                        future.complete();
+                        promise.complete();
                         logger.info("API Gateway is running on port " + port);
                         // publish log
                         publishGatewayLog("api_gateway_init_success:" + port);
                     } else {
-                        future.fail(ar.cause());
+                        promise.fail(ar.cause());
                     }
                 });
     }
@@ -121,7 +138,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                             .findAny(); // simple load balance
 
                     if (client.isPresent()) {
-                        doDispatch(context, newPath, discovery.getReference(client.get()).get(), future);
+                        doDispatch(context, "/"+prefix+newPath, discovery.getReference(client.get()).get(), future);
                     } else {
                         notFound(context);
                         future.complete();
@@ -286,9 +303,37 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                 .put("state", ""));
     }
 
+    //TODO this works on http only (change for https)
     private String buildHostURI() {
         int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT);
         final String host = config().getString("api.gateway.http.address.external", "localhost");
-        return String.format("https://%s:%d", host, port);
+        return String.format("http://%s:%d", host, port);
+    }
+
+    private void mockDiscoveryEndpoints(){
+        //TODO make discovery work
+        //API gateway default port 8787
+        final boolean ssl = false;
+
+        final String tlcDefaultHost = "localhost";
+        final int tlcDefaultPort = 8086;
+        final String tlcServiceName = "traffic-light-service";
+        final String tlcRoot = "";
+
+        final String evDefaultHost = "localhost";
+        final int evDefaultPort = 8087;
+        final String evServiceName = "ev-service";
+
+        final String keycloakDefaultHost = "localhost";
+        final int keycloakDefaultPort = 38080;
+
+        Record record = HttpEndpoint.createRecord(tlcServiceName, ssl, tlcDefaultHost, tlcDefaultPort, tlcRoot, new JsonObject().put("api.name", "lights"));
+        discovery.publish(record, ar -> {
+            if (ar.succeeded()){
+                Record publishedRecord = ar.result();
+            } else {
+                //couldnt create record
+            }
+        });
     }
 }

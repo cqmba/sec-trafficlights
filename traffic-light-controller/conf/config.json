@@ -1,0 +1,6 @@
+{
+  "api.name": "traffic-light-service",
+  "keystore.password" : "UedJ6AtmjcwF7qNQ",
+  "keystore.path" : "src/main/resources/server_keystore.jks",
+  "truststore.path" : "src/main/resources/server_truststore.jks"
+}

@@ -5,17 +5,17 @@ import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
-import io.vertx.servicediscovery.ServiceDiscoveryOptions;
 import io.vertx.servicediscovery.types.EventBusService;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 import io.vertx.servicediscovery.types.JDBCDataSource;
 import io.vertx.servicediscovery.types.MessageSource;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,16 +26,15 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
 
     private static final String LOG_EVENT_ADDRESS = "events.log";
 
-    private static final Logger logger = LoggerFactory.getLogger(BaseMicroserviceVerticle.class);
+    private static final Logger logger = LogManager.getLogger(BaseMicroserviceVerticle.class);
 
     protected ServiceDiscovery discovery;
     protected CircuitBreaker circuitBreaker;
     protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     @Override
-    public void start() throws Exception {
-        // init service discovery instance
-        discovery = ServiceDiscovery.create(vertx, new ServiceDiscoveryOptions().setBackendConfiguration(config()));
+    public void start(Promise<Void> startPromise) throws Exception {
+        discovery = ServiceDiscovery.create(vertx);
 
         // init circuit breaker instance
         JsonObject cbOptions = config().getJsonObject("circuit-breaker") != null ?
@@ -48,6 +47,7 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
                         .setResetTimeout(cbOptions.getLong("reset-timeout", 30000L))
         );
     }
+
 
     protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
         Record record = HttpEndpoint.createRecord(name, host, port, "/",
@@ -77,12 +77,6 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
         return publish(record);
     }
 
-    /**
-     * Publish a service with record.
-     *
-     * @param record service record
-     * @return async result
-     */
     private Future<Void> publish(Record record) {
         if (discovery == null) {
             try {
@@ -91,28 +85,20 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
                 throw new IllegalStateException("Cannot create discovery service");
             }
         }
-
-        Future<Void> future = Future.future();
+        Promise<Void> promise = Promise.promise();
         // publish the service
         discovery.publish(record, ar -> {
             if (ar.succeeded()) {
                 registeredRecords.add(record);
                 logger.info("Service <" + ar.result().getName() + "> published");
-                future.complete();
+                promise.complete();
             } else {
-                future.fail(ar.cause());
+                promise.fail(ar.cause());
             }
         });
-
-        return future;
+        return promise.future();
     }
 
-    /**
-     * A helper method that simply publish logs on the event bus.
-     *
-     * @param type log type
-     * @param data log message data
-     */
     protected void publishLogEvent(String type, JsonObject data) {
         JsonObject msg = new JsonObject().put("type", type)
                 .put("message", data);
@@ -127,26 +113,27 @@ public abstract class BaseMicroserviceVerticle extends AbstractVerticle {
     }
 
     @Override
-    public void stop(Future<Void> future) throws Exception {
-        // In current design, the publisher is responsible for removing the service
-        List<Future> futures = new ArrayList<>();
+    public void stop(Promise<Void> promise) throws Exception {
+        List<Promise> promises = new ArrayList<>();
         registeredRecords.forEach(record -> {
-            Future<Void> cleanupFuture = Future.future();
-            futures.add(cleanupFuture);
-            discovery.unpublish(record.getRegistration(), cleanupFuture.completer());
+            Promise<Void> cleanupPromise = Promise.promise();
+            promises.add(cleanupPromise);
+            //TODO test if completion works like this for promises
+            discovery.unpublish(record.getRegistration(), cleanupPromise);
         });
-
-        if (futures.isEmpty()) {
+        List<Future> allFutures = new ArrayList<>();
+        promises.forEach(p -> allFutures.add(p.future()));
+        if (promises.isEmpty()) {
             discovery.close();
-            future.complete();
+            promise.complete();
         } else {
-            CompositeFuture.all(futures)
+            CompositeFuture.all(allFutures)
                     .setHandler(ar -> {
                         discovery.close();
                         if (ar.failed()) {
-                            future.fail(ar.cause());
+                            promise.fail(ar.cause());
                         } else {
-                            future.complete();
+                            promise.complete();
                         }
                     });
         }

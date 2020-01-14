@@ -18,13 +18,15 @@
         <module>microservice-common</module>
 
         <!-- service components -->
+        <module>traffic-light-controller</module>
+        <module>ev-service</module>
 
     </modules>
 
     <properties>
         <vertx.version>3.8.4</vertx.version>
         <mysql.conn.version>6.0.5</mysql.conn.version>
-        <log4j.version>2.8</log4j.version>
+        <log4j.version>2.13.0</log4j.version>
 
         <!--overridden in each project packaged as a fat jar -->
         <main.verticle/>
@@ -57,6 +59,10 @@
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
+            <artifactId>vertx-web-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
             <artifactId>vertx-service-proxy</artifactId>
         </dependency>
         <dependency>
@@ -64,11 +70,22 @@
             <artifactId>vertx-sockjs-service-proxy</artifactId>
         </dependency>
 
+        <!-- Keycloak -->
+
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-auth-oauth2</artifactId>
+        </dependency>
+
         <!-- Microservice toolbox -->
 
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-service-discovery</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-service-discovery-bridge-kubernetes</artifactId>
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
@@ -85,27 +102,20 @@
 
         <!-- Logging dependencies -->
         <dependency>
-    		<groupId>org.slf4j</groupId>
-    		<artifactId>slf4j-api</artifactId>
-    		<version>1.7.30</version>
-		</dependency>
-
-		<dependency>
-    		<groupId>org.slf4j</groupId>
-    		<artifactId>slf4j-simple</artifactId>
-    		<version>1.7.30</version>
-		</dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
         <dependency>
-    		<groupId>log4j</groupId>
-   			<artifactId>log4j</artifactId>
-   			<version>1.2.17</version>
-		</dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
 
         <!-- Test dependencies -->
 
     </dependencies>
 
-    <!--
     <build>
         <plugins>
             <plugin>
@@ -114,10 +124,13 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                    <!--
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    -->
                     <generatedSourcesDirectory>src/main/generated</generatedSourcesDirectory>
                     <generatedTestSourcesDirectory>src/test/generated</generatedTestSourcesDirectory>
                 </configuration>
+                <!--
                 <executions>
                     <execution>
                         <id>default-compile</id>
@@ -144,15 +157,15 @@
                         </configuration>
                     </execution>
                 </executions>
+                -->
             </plugin>
         </plugins>
-
         <pluginManagement>
             <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.2.1</version>
                     <executions>
                         <execution>
                             <phase>package</phase>
@@ -181,6 +194,4 @@
             </plugins>
         </pluginManagement>
     </build>
-    -->
-
 </project>
