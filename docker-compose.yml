@@ -1,14 +1,47 @@
-version: '3.7'
-services:
+version: '3'
 
-  hello:
-    container_name: testapi
-    build:
-      context: ./hello-world/
-      dockerfile: ./Dockerfile
-    ports:
-      - "8080:8080"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+volumes:
+  mysql_data:
+      driver: local
+
+services:
+  mysql:
+      image: mysql:5.7
+      volumes:
+        - mysql_data:/var/lib/mysql
+      environment:
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_DATABASE: keycloak
+        MYSQL_USER: keycloak
+        MYSQL_PASSWORD: password
+  keycloak:
+      image: quay.io/keycloak/keycloak:latest
+      environment:
+        DB_VENDOR: MYSQL
+        DB_ADDR: mysql
+        DB_DATABASE: keycloak
+        DB_USER: keycloak
+        DB_PASSWORD: password
+        KEYCLOAK_USER: admin
+        KEYCLOAK_PASSWORD: password
+        # Uncomment the line below if you want to specify JDBC parameters. The parameter below is just an example, and it shouldn't be used in production without knowledge. It is highly recommended that you read the MySQL JDBC driver documentation in order to use it.
+        #JDBC_PARAMS: "connectTimeout=30000"
+      ports:
+        - 8080:8080
+      depends_on:
+        - mysql
+        
+# version: '3.7'
+# services:
+
+#   hello:
+#     container_name: testapi
+#     build:
+#       context: ./hello-world/
+#       dockerfile: ./Dockerfile
+#     ports:
+#       - "8080:8080"
+#     deploy:
+#       replicas: 1
+#       restart_policy:
+#         condition: on-failure
