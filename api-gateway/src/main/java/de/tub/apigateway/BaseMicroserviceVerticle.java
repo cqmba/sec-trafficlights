@@ -1,4 +1,4 @@
-package de.tub.microservice.common;
+package de.tub.apigateway;
 
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;

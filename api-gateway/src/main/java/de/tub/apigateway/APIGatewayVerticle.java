@@ -1,6 +1,6 @@
 package de.tub.apigateway;
 
-import de.tub.microservice.common.RestAPIVerticle;
+import de.tub.apigateway.RestAPIVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.buffer.Buffer;
@@ -36,7 +36,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
     private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
-    private OAuth2Auth oauth2;
+    //private OAuth2Auth oauth2;
 
     @Override
     public void start(Promise<Void> promise) throws Exception {
@@ -60,7 +60,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         router.get("/api/v").handler(this::apiVersion);
 
         // create OAuth 2 instance for Keycloak
-        oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
+       // oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
         //OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
         //authHandler.setupCallback(router.get("/callback"));
 
@@ -92,12 +92,12 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
         final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
+//
+//        HttpServerOptions options = new HttpServerOptions()
+//                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
+//                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
 
-        HttpServerOptions options = new HttpServerOptions()
-                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
-
-        vertx.createHttpServer(options)
+        vertx.createHttpServer(new HttpServerOptions())
                 .requestHandler(router)
                 .listen(port, host, ar -> {
                     if (ar.succeeded()) {
@@ -283,12 +283,12 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         }
     }
 
-    private void loginEntryHandler(RoutingContext context) {
-        context.response()
-                .putHeader("Location", generateAuthRedirectURI(buildHostURI()))
-                .setStatusCode(302)
-                .end();
-    }
+//    private void loginEntryHandler(RoutingContext context) {
+//        context.response()
+//                .putHeader("Location", generateAuthRedirectURI(buildHostURI()))
+//                .setStatusCode(302)
+//                .end();
+//    }
 
     private void logoutHandler(RoutingContext context) {
         context.clearUser();
@@ -296,12 +296,12 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         context.response().setStatusCode(204).end();
     }
 
-    private String generateAuthRedirectURI(String from) {
-        return oauth2.authorizeURL(new JsonObject()
-                .put("redirect_uri", from + "/callback?redirect_uri=" + from)
-                .put("scope", "")
-                .put("state", ""));
-    }
+//    private String generateAuthRedirectURI(String from) {
+//        return oauth2.authorizeURL(new JsonObject()
+//                .put("redirect_uri", from + "/callback?redirect_uri=" + from)
+//                .put("scope", "")
+//                .put("state", ""));
+//    }
 
     //TODO this works on http only (change for https)
     private String buildHostURI() {
