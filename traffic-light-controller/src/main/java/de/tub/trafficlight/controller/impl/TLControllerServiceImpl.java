@@ -41,7 +41,6 @@ public class TLControllerServiceImpl implements TLControllerService {
         vertx.setTimer(25000, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            logger.debug("Transition: New intersection state " + intersection.getCurrentIntersectionState());
             logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });
@@ -51,7 +50,6 @@ public class TLControllerServiceImpl implements TLControllerService {
         vertx.setTimer(time, event -> {
             intersection.doTransition(false, false);
             persistence.updateTrafficLightList(intersection.getTLList());
-            logger.debug("Transition: New intersection state " + intersection.getCurrentIntersectionState());
             logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
             timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
         });

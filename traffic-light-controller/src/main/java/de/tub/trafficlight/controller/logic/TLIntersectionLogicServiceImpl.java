@@ -105,7 +105,7 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
     @Override
     public int getNextTransitionTimeMs(){
-        return state.nextState(false, false).getCurrentStandardTransitionTimeMs();
+        return state.getCurrentStandardTransitionTimeMs();
     }
 
     @Override
