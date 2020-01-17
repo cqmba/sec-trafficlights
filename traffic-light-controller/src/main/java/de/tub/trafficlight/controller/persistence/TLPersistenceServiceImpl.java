@@ -43,9 +43,13 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
 
     @Override
     public boolean updateTrafficLight(int id, TrafficLight tl) {
-        TrafficLight tlUpdated = tlList.replace(id, tl);
-        if (tlUpdated != null) return true;
-        else return false;
+        if (getTrafficLight(id).isPresent()){
+            TrafficLight tlUpdated = tlList.replace(id, tl);
+            if (tlUpdated != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -2,10 +2,13 @@ package de.tub.trafficlight.controller;
 
 import de.tub.microservice.common.RestAPIVerticle;
 import de.tub.trafficlight.controller.entity.TLColor;
+import de.tub.trafficlight.controller.entity.TLPosition;
+import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -66,22 +69,39 @@ public class TLControllerVerticle extends RestAPIVerticle {
 
     private void apiPutSingle(RoutingContext routingContext) {
         String tlId = routingContext.request().getParam("tlId");
-        TrafficLight tlLight = routingContext.getBodyAsJson().mapTo(TrafficLight.class);
         int id;
         try {
             id = Integer.parseInt(tlId);
-            if (service.updateTL(id, tlLight)){
-                routingContext.response()
-                        .setStatusCode(200)
-                        .putHeader("content-type", "application/json; charset=utf-8")
-                        .end(Json.encodePrettily(tlLight));
-            } else {
-                logger.error("Error: Request " + routingContext.request().absoluteURI() + " from User " + routingContext.user().toString());
-                routingContext.fail(404);
-            }
-        } catch (NumberFormatException ex){
+        } catch (Exception ex){
             routingContext.fail(400);
+            logger.debug("Id was no int");
+            return;
         }
+        if (!service.getSingleTLState(id).isPresent()){
+            routingContext.fail(404);
+            return;
+        }
+        TrafficLight oldTl = service.getSingleTLState(id).get();
+        JsonObject json = routingContext.getBodyAsJson();
+        TLColor color = getEnumFromString(TLColor.class, json.getString("color"));
+        if (color != null){
+            oldTl.setColor(color);
+        } else {
+            routingContext.fail(400);
+            logger.debug("Color not matching possible options");
+            return;
+        }
+        if (service.updateTL(id, oldTl)){
+            //TODO change mode isAssigned
+            routingContext.response()
+                    .setStatusCode(200)
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(oldTl));
+        } else {
+            logger.error("Error: Request " + routingContext.request().absoluteURI() + " from User " + routingContext.user().toString());
+            routingContext.fail(404);
+        }
+
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
@@ -89,36 +109,67 @@ public class TLControllerVerticle extends RestAPIVerticle {
         int id;
         try {
             id = Integer.parseInt(tlId);
+        } catch (NumberFormatException e) {
+            routingContext.response().setStatusCode(404).end();
+            return;
+        }
+        if(service.getSingleTLState(id).isPresent() && service.getSingleTLState(id).get().getGroup() >= 2){
             if (service.removeTL(id)) {
                 routingContext.response().setStatusCode(204).end();
             } else {
                 routingContext.fail(400);
             }
-        } catch (NumberFormatException e) {
-            routingContext.response().setStatusCode(404).end();
+        } else {
+            routingContext.fail(400);
+            logger.debug("Intersection 1 Traffic Light cannot be deleted");
         }
+
     }
 
     private void apiPostSingle(RoutingContext routingContext) {
-        TrafficLight tlLight = routingContext.getBodyAsJson().mapTo(TrafficLight.class);
-        service.addTL(tlLight.getPosition());
+        String tlId = routingContext.request().getParam("tlId");
+        JsonObject json = routingContext.getBodyAsJson();
+        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", "UNSPECIFIED"));
+        TLType type = getEnumFromString(TLType.class, json.getString("type", "VEHICLE"));
+        TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
+        int group = json.getInteger("group");
+        int id;
+        try {
+            id = Integer.parseInt(tlId);
+        } catch (Exception ex){
+            routingContext.fail(400);
+            logger.debug("Id was no int");
+            return;
+        }
+        if (service.getSingleTLState(id).isPresent() || group == 1){
+            routingContext.fail(400);
+            logger.debug("Already exists or wrong group");
+            return;
+        }
+        TrafficLight created = service.addTL(id, color, position, type, group);
         routingContext.response()
                 .setStatusCode(201)
                 .putHeader("content-type", "application/json; charset=utf-8")
-                .end(Json.encodePrettily(tlLight));
+                .end(Json.encodePrettily(created));
     }
 
     private void apiGetSingle(RoutingContext routingContext) {
+        String tlId = routingContext.request().getParam("tlId");
+        int id;
         try {
-            String tlId = routingContext.request().getParam("tlId");
-            int id;
             id = Integer.parseInt(tlId);
-            routingContext.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(service.getSingleTLState(id)));
         } catch (Exception ex){
             routingContext.fail(400);
+            logger.debug("Id was no int");
+            return;
         }
+        if (!service.getSingleTLState(id).isPresent()){
+            routingContext.fail(404, new Exception("Not Found"));
+            return;
+        }
+        routingContext.response()
+                .putHeader("content-type", "application/json; charset=utf-8")
+                .end(Json.encodePrettily(service.getSingleTLState(id).get()));
     }
 
     private void apiGetAll(RoutingContext routingContext) {
@@ -133,40 +184,56 @@ public class TLControllerVerticle extends RestAPIVerticle {
     }
 
     private void apiChangeColor(RoutingContext routingContext){
-        //TODO test query param color
+        String tlId = routingContext.request().getParam("tlId");
+        String groupStr = "";
+        int id, group;
+        if (routingContext.request().params().contains("group")){
+            groupStr = routingContext.request().params().get("group");
+        }
         try {
-            String tlId = routingContext.request().getParam("tlId");
-            int id;
             id = Integer.parseInt(tlId);
-            String color = "";
-            TLColor tlcolor = null;
-            if(routingContext.request().params().contains("color")){
-                color = routingContext.request().params().get("color");
-                if(getEnumFromString(TLColor.class, color) != null){
-                    tlcolor = getEnumFromString(TLColor.class, color);
-                }
-            }
-            if(isEmergencyVehicleSensor()){
-                if(isAuthorized()){
-                    if (service.changeToGreen(id)){
-                        routingContext.response()
-                            .putHeader("content-type", "application/json; charset=utf-8")
-                            .end(Json.encodePrettily(service.getSingleTLState(id)));
-                    } else {
-                        throw new Exception("Couldnt execute green Light change.");
-                    }
-                } else {
-                    throw new Exception("Unauthorized Request");
-                }
-            } else {
-                if (tlcolor != null) {
-                    routingContext.response()
-                            .putHeader("content-type", "application/json; charset=utf-8")
-                            .end(Json.encodePrettily(service.changeColor(id, tlcolor)));
-                }
-            }
+            group = Integer.parseInt(groupStr);
         } catch (Exception ex){
             routingContext.fail(400);
+            logger.debug("Id was no int");
+            return;
+        }
+        if (!service.getSingleTLState(id).isPresent() || service.getSingleTLState(id).get().getGroup() != group){
+            routingContext.fail(400);
+            return;
+        }
+        String color = "";
+        TLColor tlcolor = null;
+        if(routingContext.request().params().contains("color")){
+            color = routingContext.request().params().get("color");
+            if(getEnumFromString(TLColor.class, color) != null){
+                tlcolor = getEnumFromString(TLColor.class, color);
+            }
+        }
+        if (!service.getSingleTLState(id).isPresent() || service.getSingleTLState(id).get().getGroup() != group){
+            routingContext.fail(400);
+            return;
+        }
+        if(isEmergencyVehicleSensor()){
+            if(isAuthorized()){
+                if (service.changeToGreen(id)){
+                    routingContext.response()
+                            .putHeader("content-type", "application/json; charset=utf-8")
+                            .end(Json.encodePrettily(service.getSingleTLState(id)));
+                } else {
+                    routingContext.fail(400);
+                    logger.debug("Couldnt execute green Light change.");
+                }
+            } else {
+                routingContext.fail(400);
+                logger.debug("Unauthorized Request");
+            }
+        } else {
+            if (tlcolor != null) {
+                routingContext.response()
+                        .putHeader("content-type", "application/json; charset=utf-8")
+                        .end(Json.encodePrettily(service.changeColor(id, tlcolor)));
+            }
         }
     }
 

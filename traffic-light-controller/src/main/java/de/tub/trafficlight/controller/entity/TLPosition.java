@@ -4,5 +4,6 @@ public enum TLPosition {
     MAIN_ROAD_WEST,
     MAIN_ROAD_EAST,
     SIDE_ROAD_NORTH,
-    SIDE_ROAD_SOUTH
+    SIDE_ROAD_SOUTH,
+    UNSPECIFIED
 }

@@ -23,7 +23,7 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     public TLControllerServiceImpl(Vertx vertx){
         persistence = new TLPersistenceServiceImpl();
-        intersection = new TLIntersectionLogicServiceImpl();
+        intersection = new TLIntersectionLogicServiceImpl(1);
         this.vertx = vertx;
         startSchedule();
     }
@@ -71,8 +71,8 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public TrafficLight addTL(TLPosition position) {
-        return persistence.addTrafficLight(new TrafficLight(position));
+    public TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type,  int groupId) {
+        return persistence.addTrafficLight(new TrafficLight(id, color, position, type, groupId));
     }
 
     @Override
