@@ -3,7 +3,6 @@ package de.tub.apigateway;
 import de.tub.apigateway.RestAPIVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpServerOptions;
@@ -11,21 +10,18 @@ import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.core.net.JksOptions;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
 import io.vertx.ext.auth.oauth2.OAuth2FlowType;
 import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.HttpResponse;
-import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.ext.web.handler.StaticHandler;
-import io.vertx.ext.web.handler.UserSessionHandler;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
+
 
 import java.util.List;
 import java.util.Optional;
@@ -36,12 +32,13 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
     private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
-    //private OAuth2Auth oauth2;
+    OAuth2Auth oauth2;
 
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start();
         super.start(promise);
+        
         //TODO remove this when Discovery is working
         mockDiscoveryEndpoints();
 
@@ -51,8 +48,16 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
         Router router = Router.router(vertx);
         // cookie and session handler
-        enableLocalSession(router);
-
+        //enableLocalSession(router);
+        
+        JsonObject keycloakJson = new JsonObject()
+        		  .put("realm", "vertx")
+        		  .put("auth-server-url", "http://localhost:8080/auth")
+        		  .put("ssl-required", "external")
+        		  .put("resource", "vertx-tlc")
+        		  .put("credentials", new JsonObject().put("secret", "66c8797f-2b14-413f-bcc5-7d4948fda73f"))
+        		  .put("confidential-port", 0);
+        
         // body handler
         router.route().handler(BodyHandler.create());
 
@@ -60,9 +65,9 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         router.get("/api/v").handler(this::apiVersion);
 
         // create OAuth 2 instance for Keycloak
-       // oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
-        //OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
-        //authHandler.setupCallback(router.get("/callback"));
+       oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
+       OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
+       authHandler.setupCallback(router.get("/callback"));
 
         //router.route().handler(UserSessionHandler.create(oauth2));
 
@@ -71,7 +76,15 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         // set auth callback handler
         //router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
 
-        //router.route("/protected/*").handler(authHandler);
+        router.route("/protected/*").handler(authHandler);
+        
+        router.route("/protected/test").handler(routingContext -> {
+            HttpServerResponse response = routingContext.response();
+            response
+                    .putHeader("content-type", "text/html")
+                    .end("<h1>Hello protect</h1>");
+        });
+        
         //router.get("/uaa").handler(this::authUaaHandler);
         //router.get("/login").handler(this::loginEntryHandler);
         //router.post("/logout").handler(this::logoutHandler);
@@ -86,7 +99,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         // Serve static resources from the /assets directory
         router.route("/assets/*").handler(StaticHandler.create("assets"));
         // api dispatcher
-        //router.route("/api/*").handler(authHandler);
+        router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
         final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
