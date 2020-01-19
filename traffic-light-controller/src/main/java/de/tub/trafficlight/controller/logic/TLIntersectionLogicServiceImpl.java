@@ -1,13 +1,16 @@
 package de.tub.trafficlight.controller.logic;
 
 import de.tub.trafficlight.controller.entity.*;
+import de.tub.trafficlight.controller.persistence.TLPersistenceService;
 import de.tub.trafficlight.controller.schedule.TLSchedule;
+import io.vertx.core.Promise;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,7 +39,11 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
     private List<TrafficLight> roadLights, pedLights;
 
-    public TLIntersectionLogicServiceImpl(int groupId){
+    private Optional<TLIncident> incident;
+    private TLPersistenceService persistence;
+
+    public TLIntersectionLogicServiceImpl(int groupId, TLPersistenceService persistence){
+        this.persistence = persistence;
         this.state = TLState.S0_MG_SR_PM;
         this.groupId = groupId;
         this.mw_mode = TLMode.SCHEDULED;
@@ -67,12 +74,15 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
         pedLights = new ArrayList<>(Arrays.asList(ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_east, ped4_north));
         roadLights= new ArrayList<>(Arrays.asList(main_west, main_east, side_north, side_south));
+        this.incident = Optional.empty();
         printIntersection();
     }
 
     @Override
-    public void doTransition(boolean isEmergencyMain, boolean isEmergencySide){
-        this.state = state.nextState(isEmergencyMain, isEmergencySide);
+    public void doTransition(){
+        updateIncidents();
+        this.state = calculateNextState();
+
         main_west.setColor(state.getCurrentMainRoadColor());
         main_east.setColor(state.getCurrentMainRoadColor());
         side_north.setColor(state.getCurrentSideRoadColor());
@@ -86,6 +96,35 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
         ped4_north.setColor(state.getCurrentSidePedestrianColor());
         ped4_east.setColor(state.getCurrentMainPedestrianColor());
         printIntersection();
+    }
+
+    private TLState calculateNextState() {
+        //handle incident
+        if (incident.isPresent() && incident.get().getState().equals(TLIncident.STATE.UNRESOLVED)){
+            TLState emergency_state = state.nextState(incident.get().getPosition().isMain(), incident.get().getPosition().isSide());
+            TLState scheduled_state = state.nextState(false, false);
+            logger.debug("Emergency Transition to "+ emergency_state.toString() + " ; Scheduled was "+ scheduled_state.toString());
+            return emergency_state;
+        }else {
+            return state.nextState(false, false);
+        }
+    }
+
+    private void updateIncidents() {
+        //if past incident got green now it is resolved
+        if (state.equals(TLState.S3_MR_SG_PS)){
+            persistence.resolveSideRoadIncidents();
+            incident = persistence.updateIncident(incident, false, true);
+            logger.debug("Side Road incidents have been handled.");
+        } else if(state.equals(TLState.S0_MG_SR_PM)){
+            persistence.resolveMainRoadIncidents();
+            incident = persistence.updateIncident(incident, true, false);
+            logger.debug("Main Road incidents have been handled.");
+        }
+        //load new incident if necessary
+        if (incident.isEmpty()){
+            incident = persistence.getNextUnresolvedIncident();
+        }
     }
 
     private void printIntersection(){
@@ -111,7 +150,7 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     }
 
     @Override
-    public String getCurrentIntersectionState(){
-        return state.toString();
+    public TLState getCurrentIntersectionState(){
+        return state;
     }
 }

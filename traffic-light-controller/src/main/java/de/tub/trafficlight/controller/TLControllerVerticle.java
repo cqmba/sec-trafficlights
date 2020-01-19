@@ -5,6 +5,7 @@ import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
+import io.vertx.core.MultiMap;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
@@ -17,6 +18,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
+import java.util.Optional;
 
 public class TLControllerVerticle extends RestAPIVerticle {
     //TODO bugs: bei REST delete auf Id achten
@@ -24,11 +26,11 @@ public class TLControllerVerticle extends RestAPIVerticle {
     private static final String SERVICE_NAME = "traffic-light-service";
     private static final String API_STATES = "/lights";
     private static final String API_SINGLE_STATE = "/lights/:tlId";
+    //TODO color change should be mapped to position, id is unknown to sensor
     private static final String API_SINGLE_COLOR = "/lights/:tlId/colors";
 
     private TLControllerService service;
 
-    //TODO log every action and failure and check for secure information leakage
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
     @Override
@@ -77,7 +79,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
             logger.debug("Id was no int");
             return;
         }
-        if (!service.getSingleTLState(id).isPresent()){
+        if (service.getSingleTLState(id).isEmpty()){
             routingContext.fail(404);
             return;
         }
@@ -163,7 +165,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
             logger.debug("Id was no int");
             return;
         }
-        if (!service.getSingleTLState(id).isPresent()){
+        if (service.getSingleTLState(id).isEmpty()){
             routingContext.fail(404, new Exception("Not Found"));
             return;
         }
@@ -185,55 +187,48 @@ public class TLControllerVerticle extends RestAPIVerticle {
 
     private void apiChangeColor(RoutingContext routingContext){
         String tlId = routingContext.request().getParam("tlId");
-        String groupStr = "";
-        int id, group;
-        if (routingContext.request().params().contains("group")){
-            groupStr = routingContext.request().params().get("group");
-        }
+        JsonObject json = routingContext.getBodyAsJson();
+        //TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", "UNSPECIFIED"));
+        TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
+        int group = json.getInteger("group");
+        int id;
         try {
             id = Integer.parseInt(tlId);
-            group = Integer.parseInt(groupStr);
         } catch (Exception ex){
             routingContext.fail(400);
             logger.debug("Id was no int");
             return;
         }
-        if (!service.getSingleTLState(id).isPresent() || service.getSingleTLState(id).get().getGroup() != group){
-            routingContext.fail(400);
+        if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
+            routingContext.fail(404);
             return;
         }
-        String color = "";
-        TLColor tlcolor = null;
-        if(routingContext.request().params().contains("color")){
-            color = routingContext.request().params().get("color");
-            if(getEnumFromString(TLColor.class, color) != null){
-                tlcolor = getEnumFromString(TLColor.class, color);
-            }
-        }
-        if (!service.getSingleTLState(id).isPresent() || service.getSingleTLState(id).get().getGroup() != group){
+        if (color == null){
             routingContext.fail(400);
+            logger.debug("Color not matching possible options");
             return;
         }
+        //now we have working ID, group and new color
         if(isEmergencyVehicleSensor()){
             if(isAuthorized()){
                 if (service.changeToGreen(id)){
                     routingContext.response()
                             .putHeader("content-type", "application/json; charset=utf-8")
-                            .end(Json.encodePrettily(service.getSingleTLState(id)));
+                            .end(Json.encodePrettily(new JsonObject().put("message", "success")));
                 } else {
-                    routingContext.fail(400);
                     logger.debug("Couldnt execute green Light change.");
+                    routingContext.fail(400);
                 }
             } else {
-                routingContext.fail(400);
                 logger.debug("Unauthorized Request");
+                routingContext.fail(400);
             }
         } else {
-            if (tlcolor != null) {
-                routingContext.response()
-                        .putHeader("content-type", "application/json; charset=utf-8")
-                        .end(Json.encodePrettily(service.changeColor(id, tlcolor)));
-            }
+            logger.debug("TLC-User Requested Color Assignment");
+            routingContext.response()
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(service.changeColor(id, color)));
+
         }
     }
 
@@ -252,8 +247,25 @@ public class TLControllerVerticle extends RestAPIVerticle {
             try {
                 return Enum.valueOf(c, string.trim().toUpperCase());
             } catch(IllegalArgumentException ex) {
+                //TODO handle
             }
         }
         return null;
     }
+
+    /*private void test(RoutingContext context){
+        Optional<Integer> integer = getValueFromRequestParams("id", context.request().params(), Integer.class);
+    }
+
+    private static <T> Optional<T> getValueFromRequestParams(String key, MultiMap params, Class<T> c){
+        if (params.contains(key)){
+            String value = params.get(key);
+            if (c.isEnum()){
+                if (
+                return Optional.ofNullable(getEnumFromString(c, value));
+            } else if (c.)
+        } else {
+            return Optional.empty();
+        }
+    }*/
 }
