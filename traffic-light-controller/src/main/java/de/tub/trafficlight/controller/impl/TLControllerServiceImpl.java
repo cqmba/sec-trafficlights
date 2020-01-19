@@ -18,9 +18,7 @@ public class TLControllerServiceImpl implements TLControllerService {
     private TLPersistenceService persistence;
     private TLIntersectionLogicService intersection;
     private Vertx vertx;
-
-    //private int delayMs;
-    //private static final int evDelay = 10000;
+    //private boolean interrupt;
 
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
@@ -28,7 +26,7 @@ public class TLControllerServiceImpl implements TLControllerService {
         persistence = new TLPersistenceServiceImpl();
         intersection = new TLIntersectionLogicServiceImpl(MAIN_INTERSECTION_GROUP, persistence);
         this.vertx = vertx;
-        //this.delayMs = 0;
+        //this.interrupt = false;
         startSchedule();
     }
 
@@ -46,19 +44,29 @@ public class TLControllerServiceImpl implements TLControllerService {
             intersection.doTransition();
             persistence.updateTrafficLightList(intersection.getTLList());
             logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
-            timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
+            timeNextTransition(intersection.getNextTransitionTimeMs());
         });
     }
 
-    private void timeNextTransition(Vertx vertx, int time){
+    private void timeNextTransition(int time){
         vertx.setTimer(time, event -> {
-            intersection.doTransition();
-            persistence.updateTrafficLightList(intersection.getTLList());
-            int transitionMs = intersection.getNextTransitionTimeMs();
-            //TODO check timing when emergency
-            logger.debug("Regular next Transition "+ transitionMs + "ms");
-            timeNextTransition(vertx, intersection.getNextTransitionTimeMs());
+            //TODO interrupt timer
+            /*if (interrupt){
+                logger.debug("Interrupting current Timer");
+                this.interrupt = false;
+                vertx.cancelTimer(event);
+                executeTransitionAndSetNewTimer();
+            }*/
+            executeTransitionAndSetNewTimer();
         });
+    }
+
+    private void executeTransitionAndSetNewTimer(){
+        intersection.doTransition();
+        persistence.updateTrafficLightList(intersection.getTLList());
+        int transitionMs = intersection.getNextTransitionTimeMs();
+        logger.debug("Waiting for "+ transitionMs + "ms");
+        timeNextTransition(transitionMs);
     }
     
     @Override
@@ -112,6 +120,7 @@ public class TLControllerServiceImpl implements TLControllerService {
             TrafficLight tl = getSingleTLState(tlId).get();
             if (TLType.VEHICLE.equals(tl.getType())){
                 persistence.addIncident(new TLIncident(tl.getPosition(), user, tl.getId(), TLIncident.STATE.UNRESOLVED));
+                //this.interrupt = true;
                 logger.debug("New Incident added: " + user + " requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
                 return true;
             } else {
