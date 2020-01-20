@@ -5,7 +5,6 @@ import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
-import io.vertx.core.MultiMap;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
@@ -18,7 +17,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
-import java.util.Optional;
 
 public class TLControllerVerticle extends RestAPIVerticle {
     //TODO bugs: bei REST delete auf Id achten
@@ -63,7 +61,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
                 .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
                 .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
 
-        createHttpServer(router,host,port, options)
+        createHttpServer(router,host,port, new HttpServerOptions())
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
                 .setHandler(promise);
 

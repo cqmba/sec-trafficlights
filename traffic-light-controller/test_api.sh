@@ -10,4 +10,4 @@ curl -k -i https://localhost:8086/lights/12
 read -p "Press enter to continue with DELETE"
 curl -k -i -X DELETE https://localhost:8086/lights/12
 read -p "Press enter to test Emergency Vehicle Request"
-curl -k -i -X PUT -H "Content-Type: application/json" -d '{"color":"RED", "group":1}' https://localhost:8086/lights/3/colors
+curl -k -i -X PUT -H "Content-Type: application/json" -d '{"color":"GREEN", "group":1}' https://localhost:8086/lights/3/colors
