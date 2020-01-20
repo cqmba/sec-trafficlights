@@ -1,0 +1,6 @@
+{
+  "api.name": "ev-service",
+  "keystore.password" : "password",
+  "keystore.path" : "src/main/resources/server_keystore.jks",
+  "truststore.path" : "src/main/resources/server_truststore.jks"
+}
