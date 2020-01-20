@@ -55,7 +55,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         		  .put("auth-server-url", "http://localhost:8080/auth")
         		  .put("ssl-required", "external")
         		  .put("resource", "vertx-tlc")
-        		  .put("credentials", new JsonObject().put("secret", "66c8797f-2b14-413f-bcc5-7d4948fda73f"))
+        		  .put("credentials", new JsonObject().put("secret", "f1025f5a-8170-4d67-b851-71ee71c5a97c"))
         		  .put("confidential-port", 0);
         
         // body handler
