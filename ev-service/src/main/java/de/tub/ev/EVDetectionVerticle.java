@@ -1,11 +1,12 @@
 package de.tub.ev;
 
+import de.tub.ev.dispatch.EVDispatchService;
 import de.tub.microservice.common.RestAPIVerticle;
-import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -18,43 +19,39 @@ import io.vertx.servicediscovery.types.HttpEndpoint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.List;
-
 public class EVDetectionVerticle extends RestAPIVerticle {
-    private static final String SERVICE_NAME = "ev-service";
+
     private static final String BASE_TLC_API = "/api/lights/";
+    private static final String SERVICE_NAME = "ev-service";
     private static final String API_MOCK_SENSOR_DETECT = "/sensors/:tlId";
     private static final String TARGET_SERVICE = "api-gateway";
+    private static final String DEFAULT_HOST = "localhost";
+    private static final int DEFAULT_PORT = 8087;
 
     private static final Logger logger = LogManager.getLogger(EVDetectionVerticle.class);
 
-    private EVDetectionService service;
+    private EVDispatchService service;
     private HttpClient client;
 
     @Override
     public void start(Promise<Void> promise) throws Exception {
-        //TODO might still need to start Abstract Verticle
         super.start(promise);
         mockDiscoveryEndpoints();
-        //TODO fix HttpClient
-        retrieveEndpoint(TARGET_SERVICE);
+        //service = EVDispatchService.getInstance(client, vertx);
 
         final Router router = Router.router(vertx);
         // body handler
         router.route().handler(BodyHandler.create());
 
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
-        //config
-        String host = "localhost";
-        int port = 8087;
 
-        createHttpServer(router,host,port, new HttpServerOptions())
-                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
+        createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, new HttpServerOptions())
+                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, DEFAULT_HOST, DEFAULT_PORT))
                 .setHandler(promise.future().completer());
     }
 
     private void apiRequestOnEVDetection(RoutingContext routingContext) {
-        int id = 0;
+        int id;
         try {
             id = Integer.parseInt(routingContext.pathParam("tlId"));
         } catch (Exception ex){
@@ -65,16 +62,37 @@ public class EVDetectionVerticle extends RestAPIVerticle {
             logger.debug("Sensor was requested for wrong id");
             routingContext.fail(400);
         }
-        doDispatchEVRequest(routingContext, id);
+        retrieveEndpoint(TARGET_SERVICE, id, routingContext);
     }
 
-    private void retrieveEndpoint(String service){
+    //TODO make this work with discovery
+    private void doDispatch(RoutingContext routingContext, int id){
+        //final String path = BASE_TLC_API + id +"/colors";
+        final String pathAbs = "http://localhost:8787/api/lights/" + id + "/colors";
+        JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
+        WebClient webClient = WebClient.create(vertx);
+        webClient
+                .putAbs(pathAbs)
+                .sendJsonObject(payload, ar -> {
+                    if (ar.succeeded()) {
+                        HttpResponse<Buffer> response = ar.result();
+                        logger.debug("Successfully reported EV on sensor "+ id+", status code " + response.statusCode() + "\n " +response.bodyAsString());
+                        routingContext.response().end(Json.encodePrettily(new JsonObject().put("message", "success")));
+                    } else {
+                        logger.error("Something went wrong " + ar.cause().getMessage());
+                        routingContext.fail(400);
+                    }
+                });
+    }
+
+    private void retrieveEndpoint(String service, int id, RoutingContext routingContext){
         discovery.getRecord( r -> r.getName().equals(service), ar -> {
             if(ar.succeeded()){
                 if (ar.result() != null){
                     logger.debug("Success in locating resource");
                     ServiceReference reference = discovery.getReference(ar.result());
                     this.client = reference.getAs(HttpClient.class);
+                    doDispatch(routingContext, id);
                     reference.release();
                 } else {
                     logger.debug("failed: no matching service");
@@ -83,32 +101,6 @@ public class EVDetectionVerticle extends RestAPIVerticle {
                 logger.debug("lookup failed, going to default location");
             }
         });
-    }
-
-    private void doDispatchEVRequest(RoutingContext routingContext, int id){
-        //TODO change to BASE_TLC_API when using gateway
-        final String path = BASE_TLC_API + id;
-        //final String path = "/lights/"+id;
-        WebClient webClient = WebClient.wrap(client);
-        webClient
-                .get(path)
-                .send(ar -> {
-                    if (ar.succeeded()) {
-                        HttpResponse<Buffer> response = ar.result();
-                        logger.debug("Success, status code " + response.statusCode() + "\n " +response.bodyAsString());
-                        routingContext.response().end(response.bodyAsString());
-                    } else {
-                        logger.debug("Something went wrong " + ar.cause().getMessage());
-                        routingContext.fail(400);
-                    }
-                });
-    }
-
-    private Future<List<Record>> getAllEndpoints() {
-        Future<List<Record>> future = Future.future();
-        discovery.getRecords(record -> record.getType().equals(HttpEndpoint.TYPE),
-                future.completer());
-        return future;
     }
 
     private void mockDiscoveryEndpoints(){
@@ -142,7 +134,7 @@ public class EVDetectionVerticle extends RestAPIVerticle {
             }
         });
 
-        Record record2 = HttpEndpoint.createRecord(gwServiceName, ssl, gwDefaultHost, gwDefaultPort, gwRoot, new JsonObject().put("api.name", "gateway"));
+        Record record2 = HttpEndpoint.createRecord(gwServiceName, ssl, gwDefaultHost, gwDefaultPort, gwRoot, new JsonObject().put("api.name", "lights"));
         discovery.publish(record2, ar -> {
             if (ar.succeeded()){
                 Record publishedRecord = ar.result();
