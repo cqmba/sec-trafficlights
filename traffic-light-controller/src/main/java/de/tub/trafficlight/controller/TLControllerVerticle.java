@@ -1,6 +1,6 @@
 package de.tub.trafficlight.controller;
 
-import de.tub.microservice.common.RestAPIVerticle;
+import de.tub.common.RestAPIVerticle;
 import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
@@ -19,12 +19,10 @@ import org.apache.logging.log4j.Logger;
 import java.util.List;
 
 public class TLControllerVerticle extends RestAPIVerticle {
-    //TODO bugs: bei REST delete auf Id achten
 
     private static final String SERVICE_NAME = "traffic-light-service";
     private static final String API_STATES = "/lights";
     private static final String API_SINGLE_STATE = "/lights/:tlId";
-    //TODO color change should be mapped to position, id is unknown to sensor
     private static final String API_SINGLE_COLOR = "/lights/:tlId/colors";
 
     private TLControllerService service;

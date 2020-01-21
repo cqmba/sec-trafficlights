@@ -1,4 +1,4 @@
-package de.tub.apigateway;
+package de.tub.common;
 
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;

@@ -1,4 +1,4 @@
-package de.tub.apigateway;
+package de.tub.common;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;

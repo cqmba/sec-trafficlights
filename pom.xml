@@ -12,7 +12,6 @@
     <modules>
         <!-- infrastructure components -->
         <module>api-gateway</module>
-        <module>microservice-common</module>
 
         <!-- service components -->
         <module>traffic-light-controller</module>

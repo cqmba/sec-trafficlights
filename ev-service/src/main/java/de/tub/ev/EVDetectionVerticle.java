@@ -1,7 +1,7 @@
 package de.tub.ev;
 
+import de.tub.common.RestAPIVerticle;
 import de.tub.ev.dispatch.EVDispatchService;
-import de.tub.microservice.common.RestAPIVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
