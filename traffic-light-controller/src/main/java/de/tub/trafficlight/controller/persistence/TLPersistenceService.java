@@ -1,5 +1,6 @@
 package de.tub.trafficlight.controller.persistence;
 
+import de.tub.trafficlight.controller.entity.TLIncident;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 
 import java.util.List;
@@ -23,5 +24,17 @@ public interface TLPersistenceService {
     public boolean updateTrafficLightList(List<TrafficLight> tlList);
 
     public List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
+
+    public List<TLIncident> getFilteredIncidents(Predicate<TLIncident> filter);
+
+    public TLIncident addIncident(TLIncident incident);
+
+    public Optional<TLIncident> getNextUnresolvedIncident();
+
+    public Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen);
+
+    public boolean resolveSideRoadIncidents();
+
+    public boolean resolveMainRoadIncidents();
 
 }

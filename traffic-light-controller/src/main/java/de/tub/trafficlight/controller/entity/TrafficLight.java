@@ -7,12 +7,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TrafficLight {
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private int id;
+    private int group;
     private TLColor color;
     private TLPosition position;
     private TLHealth health;
     private TLMode mode;
     private TLSchedule schedule;
     private TLType type;
+
+    public int getGroup() {
+        return group;
+    }
+
+    public void setGroup(int group) {
+        this.group = group;
+    }
 
     public TLType getType() {
         return type;
@@ -72,6 +81,7 @@ public class TrafficLight {
 
     public TrafficLight() {
         this.id = COUNTER.getAndIncrement();
+        this.group = 2;
         this.color = TLColor.GREEN;
         this.position = TLPosition.MAIN_ROAD_EAST;
         this.health = TLHealth.HEALTHY;
@@ -80,17 +90,22 @@ public class TrafficLight {
         this.type = TLType.VEHICLE;
     }
 
-    public TrafficLight(TLPosition position) {
-        this.id = COUNTER.getAndIncrement();
-        this.color = TLColor.GREEN;
+    public TrafficLight(int id, TLColor color, TLPosition position, TLType type, int group) {
+        if (id <= COUNTER.get()){
+            this.id = COUNTER.getAndIncrement();
+        } else {
+            this.id = id;
+        }
+        this.color = color;
         this.position = position;
         this.health = TLHealth.HEALTHY;
         this.mode = TLMode.SCHEDULED;
         this.schedule = new TLSchedule(5000, TLColor.YELLOWRED, TLColor.GREEN);
-        this.type = TLType.VEHICLE;
+        this.type = type;
+        this.group = group;
     }
 
-    public TrafficLight(TLColor color, TLPosition position, TLHealth health, TLMode mode, TLSchedule schedule, TLType type) {
+    public TrafficLight(TLColor color, TLPosition position, TLHealth health, TLMode mode, TLSchedule schedule, TLType type, int group) {
         this.id = COUNTER.getAndIncrement();
         this.color = color;
         this.position = position;
@@ -98,5 +113,6 @@ public class TrafficLight {
         this.mode = mode;
         this.schedule = schedule;
         this.type = type;
+        this.group = group;
     }
 }

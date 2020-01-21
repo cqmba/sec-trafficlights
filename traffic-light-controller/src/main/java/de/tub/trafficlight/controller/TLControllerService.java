@@ -2,6 +2,7 @@ package de.tub.trafficlight.controller;
 
 import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
+import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import de.tub.trafficlight.controller.impl.TLControllerServiceImpl;
 import io.vertx.core.Vertx;
@@ -18,7 +19,7 @@ public interface TLControllerService {
 
     List<TrafficLight> getTLList();
 
-    TrafficLight addTL(TLPosition position);
+    TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type, int groupId);
 
     boolean removeTL(int tlId);
 
