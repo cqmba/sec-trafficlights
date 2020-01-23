@@ -3,7 +3,6 @@ package de.tub.apigateway;
 import de.tub.microservice.common.RestAPIVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpServerOptions;
@@ -12,22 +11,17 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
+import io.vertx.core.net.PemTrustOptions;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
-import io.vertx.ext.auth.oauth2.OAuth2FlowType;
-import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.HttpResponse;
-import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.ext.web.handler.StaticHandler;
-import io.vertx.ext.web.handler.UserSessionHandler;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
-import io.vertx.servicediscovery.kubernetes.KubernetesServiceImporter;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 
+import javax.crypto.Cipher;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,13 +88,12 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
         final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
-        final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
+        //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
-        HttpServerOptions options = new HttpServerOptions()
-                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
+        HttpServerOptions options = new HttpServerOptions().setPemTrustOptions(new PemTrustOptions().addCertPath("tlc.pem"))
+                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
-        vertx.createHttpServer(new HttpServerOptions())
+        vertx.createHttpServer(options)
                 .requestHandler(router)
                 .listen(port, host, ar -> {
                     if (ar.succeeded()) {
@@ -315,7 +308,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     private void mockDiscoveryEndpoints(){
         //TODO make discovery work
         //API gateway default port 8787
-        final boolean ssl = false;
+        final boolean ssl = true;
 
         final String tlcDefaultHost = "localhost";
         final int tlcDefaultPort = 8086;

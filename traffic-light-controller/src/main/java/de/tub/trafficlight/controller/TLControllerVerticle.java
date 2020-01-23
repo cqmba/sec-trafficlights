@@ -10,6 +10,7 @@ import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
+import io.vertx.core.net.PemTrustOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -55,13 +56,13 @@ public class TLControllerVerticle extends RestAPIVerticle {
 
         final String keystorepass = config().getString("keystore.password", "UedJ6AtmjcwF7qNQ");
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
-        final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
+        //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
         HttpServerOptions options = new HttpServerOptions()
                 .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
+                .setPemTrustOptions(new PemTrustOptions().addCertPath("gateway.pem"));
 
-        createHttpServer(router,host,port, new HttpServerOptions())
+        createHttpServer(router,host,port, options)
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
                 .setHandler(promise);
 

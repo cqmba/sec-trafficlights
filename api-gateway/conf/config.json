@@ -15,6 +15,5 @@
   },
   "confidential-port": 0,
   "keystore.password" : "4mB8nqJd5YEHFkw6",
-  "keystore.path" : "src/main/resources/server_keystore.jks",
-  "truststore.path" : "src/main/resources/server_truststore.jks"
+  "keystore.path" : "gateway_keystore.jks"
 }
