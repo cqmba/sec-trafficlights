@@ -1,24 +1,36 @@
 package de.tub.trafficlight.controller;
 
-import de.tub.common.RestAPIVerticle;
 import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.SessionHandler;
+import io.vertx.ext.web.sstore.LocalSessionStore;
+import io.vertx.servicediscovery.Record;
+import io.vertx.servicediscovery.ServiceDiscovery;
+import io.vertx.servicediscovery.types.HttpEndpoint;
+import io.vertx.servicediscovery.types.JDBCDataSource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
-public class TLControllerVerticle extends RestAPIVerticle {
+public class TLControllerVerticle extends AbstractVerticle {
 
     private static final String SERVICE_NAME = "traffic-light-service";
     private static final String API_STATES = "/lights";
@@ -26,6 +38,8 @@ public class TLControllerVerticle extends RestAPIVerticle {
     private static final String API_SINGLE_COLOR = "/lights/:tlId/colors";
 
     private TLControllerService service;
+    private ServiceDiscovery discovery;
+    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
@@ -33,6 +47,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
     public void start(Promise<Void> promise) throws Exception {
         super.start(promise);
         //TODO retrieve config
+        discovery = ServiceDiscovery.create(vertx);
 
         this.service = TLControllerService.createService(vertx);
 
@@ -255,19 +270,113 @@ public class TLControllerVerticle extends RestAPIVerticle {
         return null;
     }
 
-    /*private void test(RoutingContext context){
-        Optional<Integer> integer = getValueFromRequestParams("id", context.request().params(), Integer.class);
+    protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
+        Promise<HttpServer> httpServerPromise = Promise.promise();
+        vertx.createHttpServer(options)
+                .requestHandler(router)
+                .listen(port, host, httpServerPromise);
+        logger.info("Http Server started at " + host +port);
+        return httpServerPromise.future().map(r -> null);
     }
 
-    private static <T> Optional<T> getValueFromRequestParams(String key, MultiMap params, Class<T> c){
-        if (params.contains(key)){
-            String value = params.get(key);
-            if (c.isEnum()){
-                if (
-                return Optional.ofNullable(getEnumFromString(c, value));
-            } else if (c.)
-        } else {
-            return Optional.empty();
+    protected void enableLocalSession(Router router) {
+        //router.route().handler(CookieHandler.create());
+        router.route().handler(SessionHandler.create(
+                LocalSessionStore.create(vertx, "shopping.user.session")));
+    }
+
+    protected void badRequest(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(400)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected void notFound(RoutingContext context) {
+        context.response().setStatusCode(404)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("message", "not_found").encodePrettily());
+    }
+
+    protected void internalError(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(500)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected void badGateway(Throwable ex, RoutingContext context) {
+        ex.printStackTrace();
+        context.response()
+                .setStatusCode(502)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", "bad_gateway")
+                        //.put("message", ex.getMessage())
+                        .encodePrettily());
+    }
+
+
+    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+        Record record = HttpEndpoint.createRecord(name, host, port, "/",
+                new JsonObject().put("api.name", config().getString("api.name", ""))
+        );
+        return publish(record);
+    }
+
+    protected Future<Void> publishApiGateway(String host, int port) {
+        Record record = HttpEndpoint.createRecord("api-gateway", true, host, port, "/", null)
+                .setType("api-gateway");
+        return publish(record);
+    }
+
+    protected Future<Void> publishJDBCDataSource(String name, JsonObject location) {
+        Record record = JDBCDataSource.createRecord(name, location, new JsonObject());
+        return publish(record);
+    }
+
+    private Future<Void> publish(Record record) {
+        if (discovery == null) {
+            try {
+                start();
+            } catch (Exception e) {
+                throw new IllegalStateException("Cannot create discovery service");
+            }
         }
-    }*/
+        Promise<Void> promise = Promise.promise();
+        // publish the service
+        discovery.publish(record, ar -> {
+            if (ar.succeeded()) {
+                registeredRecords.add(record);
+                logger.info("Service <" + ar.result().getName() + "> published");
+                promise.complete();
+            } else {
+                promise.fail(ar.cause());
+            }
+        });
+        return promise.future();
+    }
+
+    @Override
+    public void stop(Promise<Void> promise) throws Exception {
+        List<Promise> promises = new ArrayList<>();
+        registeredRecords.forEach(record -> {
+            Promise<Void> cleanupPromise = Promise.promise();
+            promises.add(cleanupPromise);
+            discovery.unpublish(record.getRegistration(), cleanupPromise);
+        });
+        List<Future> allFutures = new ArrayList<>();
+        promises.forEach(p -> allFutures.add(p.future()));
+        if (promises.isEmpty()) {
+            discovery.close();
+            promise.complete();
+        } else {
+            CompositeFuture.all(allFutures)
+                    .setHandler(ar -> {
+                        discovery.close();
+                        if (ar.failed()) {
+                            promise.fail(ar.cause());
+                        } else {
+                            promise.complete();
+                        }
+                    });
+        }
+    }
 }
