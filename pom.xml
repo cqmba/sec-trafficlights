@@ -20,7 +20,7 @@
     </modules>
 
     <properties>
-        <vertx.version>3.8.4</vertx.version>
+        <vertx.version>3.8.5</vertx.version>
         <mysql.conn.version>6.0.5</mysql.conn.version>
         <log4j.version>2.13.0</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
