@@ -9,6 +9,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JdkSSLEngineOptions;
 import io.vertx.core.net.JksOptions;
 import io.vertx.core.net.PemTrustOptions;
 import io.vertx.ext.web.Router;
@@ -59,8 +60,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
         //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
         HttpServerOptions options = new HttpServerOptions()
-                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-                .setPemTrustOptions(new PemTrustOptions().addCertPath("gateway.pem"));
+                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
         createHttpServer(router,host,port, options)
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))

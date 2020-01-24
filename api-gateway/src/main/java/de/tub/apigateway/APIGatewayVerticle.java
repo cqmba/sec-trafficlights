@@ -90,7 +90,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
         //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
-        HttpServerOptions options = new HttpServerOptions().setPemTrustOptions(new PemTrustOptions().addCertPath("tlc.pem"))
+        HttpServerOptions options = new HttpServerOptions()
                 .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
         vertx.createHttpServer(options)

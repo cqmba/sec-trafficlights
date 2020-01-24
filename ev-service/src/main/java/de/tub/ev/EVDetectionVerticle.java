@@ -8,6 +8,7 @@ import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
@@ -45,7 +46,13 @@ public class EVDetectionVerticle extends RestAPIVerticle {
 
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
-        createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, new HttpServerOptions())
+        final String keystorePass = config().getString("keystore.password");
+        final String keystorePath = config().getString("keystore.path");
+
+        HttpServerOptions options = new HttpServerOptions().setSsl(true)
+                .setKeyStoreOptions(new JksOptions().setPath(keystorePath).setPassword(keystorePass));
+
+        createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, options)
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, DEFAULT_HOST, DEFAULT_PORT))
                 .setHandler(promise.future().completer());
     }
@@ -68,7 +75,7 @@ public class EVDetectionVerticle extends RestAPIVerticle {
     //TODO make this work with discovery
     private void doDispatch(RoutingContext routingContext, int id){
         //final String path = BASE_TLC_API + id +"/colors";
-        final String pathAbs = "http://localhost:8787/api/lights/" + id + "/colors";
+        final String pathAbs = "https://localhost:8086/lights/" + id + "/colors";
         JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
         WebClient webClient = WebClient.create(vertx);
         webClient
