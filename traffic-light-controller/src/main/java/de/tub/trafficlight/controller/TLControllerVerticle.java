@@ -53,13 +53,19 @@ public class TLControllerVerticle extends RestAPIVerticle {
 
         final String keystorepass = config().getString("keystore.password", "UedJ6AtmjcwF7qNQ");
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
-        final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
+        //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
 
         HttpServerOptions options = new HttpServerOptions()
-                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
+                .setSsl(true)
+                .removeEnabledSecureTransportProtocol("TLSv1")
+                .removeEnabledSecureTransportProtocol("TLSv1.1")
+                .removeEnabledSecureTransportProtocol("TLSv1.2")
+                .addEnabledSecureTransportProtocol("TLSv1.3")
+                .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
+                .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
+                .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
-        createHttpServer(router,host,port, new HttpServerOptions())
+        createHttpServer(router,host,port, options)
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
                 .setHandler(promise);
 

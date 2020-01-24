@@ -55,3 +55,12 @@ TODO liste
 * Applications need to be able to verify authorization from oAuth and log access
 * We should get the MySQL server running so that we can configure log4j to work over jdbc (Encrypted communication?)
 * Verify and test /lights backend
+
+
+RELEASE notes
+
+SSL settings:
+Supported version: TLSv1.3 only
+Enabled Cipher suites: TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384
+Advanced ciphers we wanted to enable as well but they are not supported:TLS_CHACHA20_POLY1305_SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256
+Configuration (Advanced = strongest) taken from https://owasp.org/www-project-cheat-sheets/cheatsheets/TLS_Cipher_String_Cheat_Sheet.html

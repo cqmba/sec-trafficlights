@@ -1,22 +1,26 @@
 package de.tub.apigateway;
 
 import de.tub.common.RestAPIVerticle;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
-import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientRequest;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.client.HttpRequest;
+import io.vertx.ext.web.client.HttpResponse;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.servicediscovery.Record;
-import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 
 import java.util.List;
@@ -34,6 +38,8 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     public void start(Promise<Void> promise) throws Exception {
         super.start();
         super.start(promise);
+        //Kubernetes Service Discovery might look like something like this
+        //ServiceDiscovery.create(vertx).registerServiceImporter(new KubernetesServiceImporter(), new JsonObject());
         //TODO remove this when Discovery is working
         mockDiscoveryEndpoints();
 
@@ -52,13 +58,11 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         router.get("/api/v").handler(this::apiVersion);
 
         // create OAuth 2 instance for Keycloak
-       // oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
+        //oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
         //OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
         //authHandler.setupCallback(router.get("/callback"));
 
         //router.route().handler(UserSessionHandler.create(oauth2));
-
-        String hostURI = buildHostURI();
 
         // set auth callback handler
         //router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
@@ -75,21 +79,25 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                     .end("<h1>Hello vertx</h1>");
         });
 
-        // Serve static resources from the /assets directory
         router.route("/assets/*").handler(StaticHandler.create("assets"));
         // api dispatcher
         //router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
         final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
-        final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
-        final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
-//
-//        HttpServerOptions options = new HttpServerOptions()
-//                .setSsl(true).setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath))
-//                .setTrustStoreOptions(new JksOptions().setPassword(keystorepass).setPath(truststorepath));
+        final String keystorepath = config().getString("keystore.path", "gateway_keystore.jks");
 
-        vertx.createHttpServer(new HttpServerOptions())
+        HttpServerOptions options = new HttpServerOptions()
+                .setSsl(true)
+                .removeEnabledSecureTransportProtocol("TLSv1")
+                .removeEnabledSecureTransportProtocol("TLSv1.1")
+                .removeEnabledSecureTransportProtocol("TLSv1.2")
+                .addEnabledSecureTransportProtocol("TLSv1.3")
+                .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
+                .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
+                .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
+
+        vertx.createHttpServer(options)
                 .requestHandler(router)
                 .listen(port, host, ar -> {
                     if (ar.succeeded()) {
@@ -107,83 +115,94 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     private void dispatchRequests(RoutingContext context) {
         int initialOffset = 5; // length of `/api/`
         // run with circuit breaker in order to deal with failure
-        circuitBreaker.execute(future -> {
-            getAllEndpoints().setHandler(ar -> {
-                if (ar.succeeded()) {
-                    List<Record> recordList = ar.result();
-                    // get relative path and retrieve prefix to dispatch client
-                    String path = context.request().uri();
+        circuitBreaker.execute(future -> getAllEndpoints().setHandler(ar -> {
+            if (ar.succeeded()) {
+                List<Record> recordList = ar.result();
+                // get relative path and retrieve prefix to dispatch client
+                String path = context.request().uri();
 
-                    if (path.length() <= initialOffset) {
-                        notFound(context);
-                        future.complete();
-                        return;
-                    }
-                    String prefix = (path.substring(initialOffset)
-                            .split("/"))[0];
-                    // generate new relative path
-                    String newPath = path.substring(initialOffset + prefix.length());
-                    // get one relevant HTTP client, may not exist
-                    Optional<Record> client = recordList.stream()
-                            .filter(record -> record.getMetadata().getString("api.name") != null)
-                            .filter(record -> record.getMetadata().getString("api.name").equals(prefix))
-                            .findAny(); // simple load balance
-
-                    if (client.isPresent()) {
-                        doDispatch(context, "/"+prefix+newPath, discovery.getReference(client.get()).get(), future);
-                    } else {
-                        notFound(context);
-                        future.complete();
-                    }
-                } else {
-                    future.fail(ar.cause());
+                if (path.length() <= initialOffset) {
+                    notFound(context);
+                    future.complete();
+                    return;
                 }
-            });
-        }).setHandler(ar -> {
+                String prefix = (path.substring(initialOffset)
+                        .split("/"))[0];
+                // generate new relative path
+                String newPath = path.substring(initialOffset + prefix.length());
+                // get one relevant HTTP client, may not exist
+                Optional<Record> client = recordList.stream()
+                        .filter(record -> record.getMetadata().getString("api.name") != null)
+                        .filter(record -> record.getMetadata().getString("api.name").equals(prefix))
+                        .findAny(); // simple load balance
+
+                if (client.isPresent() && client.get().getLocation().containsKey("endpoint")) {
+                    String endpoint = client.get().getLocation().getString("endpoint");
+                    doDispatch(context, "/"+prefix+newPath, endpoint, future);
+                    //ggf release discovery object
+                    //ServiceDiscovery.releaseServiceObject(discovery, client);
+                } else {
+                    notFound(context);
+                    future.complete();
+                }
+            } else {
+                future.fail(ar.cause());
+            }
+        })).setHandler(ar -> {
             if (ar.failed()) {
                 badGateway(ar.cause(), context);
             }
         });
     }
 
-    /**
-     * Dispatch the request to the downstream REST layers.
-     *  @param context routing context instance
-     * @param path    relative path
-     * @param client  relevant HTTP client
-     * @param cbPromise
-     */
-    private void doDispatch(RoutingContext context, String path, HttpClient client, Promise<Object> cbPromise) {
-        HttpClientRequest toReq = client
-                .request(context.request().method(), path, response -> {
-                    response.bodyHandler(body -> {
-                        if (response.statusCode() >= 500) { // api endpoint server error, circuit breaker should fail
-                            cbPromise.fail(response.statusCode() + ": " + body.toString());
-                        } else {
-                            HttpServerResponse toRsp = context.response()
-                                    .setStatusCode(response.statusCode());
-                            response.headers().forEach(header -> {
-                                toRsp.putHeader(header.getKey(), header.getValue());
-                            });
-                            // send response
-                            toRsp.end(body);
-                            cbPromise.complete();
-                        }
-                        ServiceDiscovery.releaseServiceObject(discovery, client);
-                    });
-                });
-        // set headers
-        context.request().headers().forEach(header -> {
-            toReq.putHeader(header.getKey(), header.getValue());
-        });
-        if (context.user() != null) {
-            toReq.putHeader("user-principal", context.user().principal().encode());
+    private void doDispatch(RoutingContext context, String path, String endpoint, Promise<Object> cbPromise) {
+
+        final String truststorepath = config().getString("truststore.path", "gateway_truststore.jks");
+        final String truststorepass = config().getString("truststore.pass", "password");
+
+        WebClientOptions options = new WebClientOptions()
+                .setSsl(true).setTrustStoreOptions(new JksOptions().setPath(truststorepath).setPassword(truststorepass))
+                .removeEnabledSecureTransportProtocol("TLSv1")
+                .removeEnabledSecureTransportProtocol("TLSv1.1")
+                .removeEnabledSecureTransportProtocol("TLSv1.2")
+                .addEnabledSecureTransportProtocol("TLSv1.3")
+                .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
+                .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
+                .setVerifyHost(true);
+
+        WebClient webClient = WebClient.create(vertx, options);
+        String absURI = endpoint+path;
+        HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
+        if (context.request().headers().size() >= 1){
+            request.putHeaders(context.request().headers());
         }
-        // send request
-        if (context.getBody() == null) {
-            toReq.end();
+        if (context.user() != null) {
+            request.putHeader("user-principal", context.user().principal().encode());
+        }
+        if (context.getBody() == null){
+            request.send(ar -> {
+                handleAsyncResult(context, cbPromise, ar);
+            });
         } else {
-            toReq.end(context.getBody());
+            request.sendBuffer(context.getBody(), ar -> {
+                handleAsyncResult(context, cbPromise, ar);
+            });
+        }
+    }
+
+    private void handleAsyncResult(RoutingContext context, Promise<Object> cbPromise, AsyncResult<HttpResponse<Buffer>> ar) {
+        if (ar.succeeded()) {
+            HttpResponse<Buffer> result = ar.result();
+            HttpServerResponse toRsp = context.response()
+                    .setStatusCode(result.statusCode());
+            result.headers().forEach(header -> {
+                toRsp.putHeader(header.getKey(), header.getValue());
+            });
+            toRsp.end(result.body());
+            cbPromise.complete();
+
+        } else {
+            cbPromise.fail("No response");
         }
     }
 
@@ -192,11 +211,6 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                 .end(new JsonObject().put("version", "v1").encodePrettily());
     }
 
-    /**
-     * Get all REST endpoints from the service discovery infrastructure.
-     *
-     * @return async result
-     */
     private Future<List<Record>> getAllEndpoints() {
         Future<List<Record>> future = Future.future();
         discovery.getRecords(record -> record.getType().equals(HttpEndpoint.TYPE),
@@ -275,37 +289,36 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         }
     }
 
-//    private void loginEntryHandler(RoutingContext context) {
-//        context.response()
-//                .putHeader("Location", generateAuthRedirectURI(buildHostURI()))
-//                .setStatusCode(302)
-//                .end();
-//    }
+    /*private void loginEntryHandler(RoutingContext context) {
+        context.response()
+                .putHeader("Location", generateAuthRedirectURI(buildHostURI()))
+                .setStatusCode(302)
+                .end();
+    }
 
     private void logoutHandler(RoutingContext context) {
         context.clearUser();
         context.session().destroy();
         context.response().setStatusCode(204).end();
-    }
+    }*/
 
-//    private String generateAuthRedirectURI(String from) {
-//        return oauth2.authorizeURL(new JsonObject()
-//                .put("redirect_uri", from + "/callback?redirect_uri=" + from)
-//                .put("scope", "")
-//                .put("state", ""));
-//    }
+    /*private String generateAuthRedirectURI(String from) {
+        return oauth2.authorizeURL(new JsonObject()
+                .put("redirect_uri", from + "/callback?redirect_uri=" + from)
+                .put("scope", "")
+                .put("state", ""));
+    }*/
 
-    //TODO this works on http only (change for https)
     private String buildHostURI() {
         int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT);
         final String host = config().getString("api.gateway.http.address.external", "localhost");
-        return String.format("http://%s:%d", host, port);
+        return String.format("https://%s:%d", host, port);
     }
 
     private void mockDiscoveryEndpoints(){
         //TODO make discovery work
         //API gateway default port 8787
-        final boolean ssl = false;
+        final boolean ssl = true;
 
         final String tlcDefaultHost = "localhost";
         final int tlcDefaultPort = 8086;

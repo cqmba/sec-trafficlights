@@ -8,10 +8,12 @@ import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceReference;
@@ -45,9 +47,22 @@ public class EVDetectionVerticle extends RestAPIVerticle {
 
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
-        createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, new HttpServerOptions())
+        final String keystorepass = config().getString("keystore.password", "password");
+        final String keystorepath = config().getString("keystore.path", "ev_keystore.jks");
+
+        HttpServerOptions options = new HttpServerOptions()
+                .setSsl(true)
+                .removeEnabledSecureTransportProtocol("TLSv1")
+                .removeEnabledSecureTransportProtocol("TLSv1.1")
+                .removeEnabledSecureTransportProtocol("TLSv1.2")
+                .addEnabledSecureTransportProtocol("TLSv1.3")
+                .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
+                .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
+                .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
+
+        createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, options)
                 .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, DEFAULT_HOST, DEFAULT_PORT))
-                .setHandler(promise.future().completer());
+                .setHandler(promise);
     }
 
     private void apiRequestOnEVDetection(RoutingContext routingContext) {
@@ -67,10 +82,23 @@ public class EVDetectionVerticle extends RestAPIVerticle {
 
     //TODO make this work with discovery
     private void doDispatch(RoutingContext routingContext, int id){
+        final String truststorepath = config().getString("truststore.path", "ev_truststore.jks");
+        final String truststorepass = config().getString("truststore.pass", "password");
+
+        WebClientOptions options = new WebClientOptions()
+                .setSsl(true).setTrustStoreOptions(new JksOptions().setPath(truststorepath).setPassword(truststorepass))
+                .removeEnabledSecureTransportProtocol("TLSv1")
+                .removeEnabledSecureTransportProtocol("TLSv1.1")
+                .removeEnabledSecureTransportProtocol("TLSv1.2")
+                .addEnabledSecureTransportProtocol("TLSv1.3")
+                .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
+                .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
+                .setVerifyHost(true);
+
         //final String path = BASE_TLC_API + id +"/colors";
-        final String pathAbs = "http://localhost:8787/api/lights/" + id + "/colors";
+        final String pathAbs = "https://localhost:8787/api/lights/" + id + "/colors";
         JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
-        WebClient webClient = WebClient.create(vertx);
+        WebClient webClient = WebClient.create(vertx, options);
         webClient
                 .putAbs(pathAbs)
                 .sendJsonObject(payload, ar -> {
