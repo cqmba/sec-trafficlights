@@ -4,18 +4,18 @@ FRONTEND_STOREPASS=uV9UVrKRpC39mmf5
 EV_STOREPASS=2E63KpCw89yXuVqS
 TLC_STOREPASS=UedJ6AtmjcwF7qNQ
 GATEWAY_STOREPASS=4mB8nqJd5YEHFkw6
-ALIAS_GATEWAY=selfsigned
-ALIAS_TLC=selfsigned
-ALIAS_EV=selfsigned
-ALIAS_FRONTEND=selfsigned
+ALIAS_GATEWAY=gateway
+ALIAS_TLC=tlc
+ALIAS_EV=ev
+ALIAS_FRONTEND=frontend
 NAME_GATEWAY=gateway
 NAME_TLC=tlc
 NAME_EV=ev
 NAME_FRONTEND=frontend
-DOMAIN_TLC="CN=localhost"
-DOMAIN_GATEWAY="CN=localhost"
-DOMAIN_EV="CN=localhost"
-DOMAIN_FRONTEND="CN=localhost"
+DOMAIN_TLC="CN=localhost,C=DE"
+DOMAIN_GATEWAY="CN=localhost,C=DE"
+DOMAIN_EV="CN=localhost,C=DE"
+DOMAIN_FRONTEND="CN=localhost,C=DE"
 
 #generates PKCS12 keystore
 echo "Generating TLC Keystore/Keypair"
@@ -44,14 +44,14 @@ keytool -export -alias $ALIAS_FRONTEND -storepass $FRONTEND_STOREPASS -rfc -file
 
 
 #echo "Importing TLC,EV,FRONTEND certificate into gateway truststore"
-#keytool -importcert -v -alias $ALIAS_TLC -file ${NAME_TLC}.cer -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
-#keytool -importcert -v -alias $ALIAS_EV -file ${NAME_EV}.cer -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
-#keytool -importcert -v -alias $ALIAS_FRONTEND -file ${NAME_FRONTEND}.cer -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_TLC -file ${NAME_TLC}.pem -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_EV -file ${NAME_EV}.pem -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_FRONTEND -file ${NAME_FRONTEND}.pem -keystore ${NAME_GATEWAY}_truststore.jks -storepass $GATEWAY_STOREPASS -noprompt
 
 #echo "Importing Gateway certificate into TLC, EV, FRONTEND truststore"
-#keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.cer -keystore ${NAME_TLC}_truststore.jks -storepass $TLC_STOREPASS -noprompt
-#keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.cer -keystore ${NAME_EV}_truststore.jks -storepass $EV_STOREPASS -noprompt
-#keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.cer -keystore ${NAME_FRONTEND}_truststore.jks -storepass $TLC_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.pem -keystore ${NAME_TLC}_truststore.jks -storepass $TLC_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.pem -keystore ${NAME_EV}_truststore.jks -storepass $EV_STOREPASS -noprompt
+keytool -importcert -v -alias $ALIAS_GATEWAY -file ${NAME_GATEWAY}.pem -keystore ${NAME_FRONTEND}_truststore.jks -storepass $TLC_STOREPASS -noprompt
 
 #TODO copy to subdirectories and possibly rename
 #mkdir --parents ./ev-service/src/main/resources/
