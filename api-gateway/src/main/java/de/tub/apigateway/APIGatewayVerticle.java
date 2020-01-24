@@ -1,17 +1,19 @@
 package de.tub.apigateway;
 
-import de.tub.common.RestAPIVerticle;
-import io.vertx.core.AsyncResult;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
+import io.vertx.circuitbreaker.CircuitBreaker;
+import io.vertx.circuitbreaker.CircuitBreakerOptions;
+import io.vertx.config.ConfigRetriever;
+import io.vertx.config.ConfigRetrieverOptions;
+import io.vertx.config.ConfigStoreOptions;
+import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
-import io.vertx.ext.auth.oauth2.OAuth2Auth;
 import io.vertx.ext.healthchecks.HealthCheckHandler;
 import io.vertx.ext.healthchecks.HealthChecks;
 import io.vertx.ext.healthchecks.Status;
@@ -22,16 +24,21 @@ import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.ext.web.handler.StaticHandler;
+import io.vertx.ext.web.handler.SessionHandler;
+import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
+import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
+import io.vertx.servicediscovery.types.JDBCDataSource;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class APIGatewayVerticle extends RestAPIVerticle {
+public class APIGatewayVerticle extends AbstractVerticle {
 
     private static final int DEFAULT_PORT_GW = 8787;
     private static final int DEFAULT_PORT_TLC = 8086;
@@ -45,63 +52,45 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     private final String dbService = "database";
     private final String keycloakService = "keycloak";
 
-    private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
+    protected ServiceDiscovery discovery;
+    protected CircuitBreaker circuitBreaker;
+    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
-    //private OAuth2Auth oauth2;
+    private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start();
-        super.start(promise);
+        //initConfig();
+        discovery = ServiceDiscovery.create(vertx);
+        initCircuitBreaker();
+        //TODO Kubernetes Discovery
         //Kubernetes Service Discovery might look like something like this
         //ServiceDiscovery.create(vertx).registerServiceImporter(new KubernetesServiceImporter(), new JsonObject());
-        //TODO remove this when Discovery is working
         mockDiscoveryEndpoints();
 
-        // get HTTP host and port from configuration, or use default value
         String host = config().getString("api.gateway.http.address", "localhost");
         int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT_GW);
 
         Router router = Router.router(vertx);
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
         registerHealthEndpoints(healthHandler);
-        // cookie and session handler
+
         enableLocalSession(router);
-
-        // body handler
         router.route().handler(BodyHandler.create());
-
-        // version handler
         router.get("/api/v").handler(this::apiVersion);
-
-        // create OAuth 2 instance for Keycloak
-        //oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, config());
-        //OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
-        //authHandler.setupCallback(router.get("/callback"));
-
-        //router.route().handler(UserSessionHandler.create(oauth2));
-
-        // set auth callback handler
-        //router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
-
-        //router.route("/protected/*").handler(authHandler);
-        //router.get("/uaa").handler(this::authUaaHandler);
-        //router.get("/login").handler(this::loginEntryHandler);
-        //router.post("/logout").handler(this::logoutHandler);
 
         router.route("/").handler(routingContext -> {
             HttpServerResponse response = routingContext.response();
             response
                     .putHeader("content-type", "text/html")
-                    .end("<h1>Hello vertx</h1>");
+                    .end("<h1>This is the gateway, please use the API</h1>");
         });
         router.get("/health").handler(healthHandler);
-        router.route("/assets/*").handler(StaticHandler.create("assets"));
-        // api dispatcher
-        //router.route("/api/*").handler(authHandler);
+
         router.route("/api/*").handler(this::dispatchRequests);
 
-        final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
+        final String keystorepass = config().getString("keystore.password", "password");
         final String keystorepath = config().getString("keystore.path", "gateway_keystore.jks");
 
         HttpServerOptions options = new HttpServerOptions()
@@ -120,13 +109,42 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                     if (ar.succeeded()) {
                         publishApiGateway(host, port);
                         promise.complete();
-                        logger.info("API Gateway is running on port " + port);
-                        // publish log
-                        publishGatewayLog("api_gateway_init_success:" + port);
+                        logger.debug("API Gateway is running on port " + port);
                     } else {
                         promise.fail(ar.cause());
                     }
                 });
+    }
+
+    /*private void initConfig(){
+        ConfigStoreOptions fileStore = new ConfigStoreOptions().setType("file").setConfig(new JsonObject().put("path", "config.json"));
+        ConfigRetrieverOptions configOptions = new ConfigRetrieverOptions().addStore(fileStore);
+        ConfigRetriever retriever = ConfigRetriever.create(vertx, configOptions);
+        retriever.getConfig(ar -> {
+            if (ar.succeeded() && !config().containsKey("keystore.password")){
+                logger.debug("Config successfully loaded");
+                JsonObject result = ar.result();
+                vertx.close();
+                // Create a new Vert.x instance using the retrieve configuration
+                VertxOptions options = new VertxOptions(result);
+                Vertx newVertx = Vertx.vertx(options);
+                newVertx.deployVerticle(APIGatewayVerticle.class.getName());
+            }else {
+                logger.error("Could not load config.");
+            }
+        });
+    }*/
+
+    private void initCircuitBreaker(){
+        JsonObject cbOptions = config().getJsonObject("circuit-breaker") != null ?
+                config().getJsonObject("circuit-breaker") : new JsonObject();
+        circuitBreaker = CircuitBreaker.create(cbOptions.getString("name", "circuit-breaker"), vertx,
+                new CircuitBreakerOptions()
+                        .setMaxFailures(cbOptions.getInteger("max-failures", 5))
+                        .setTimeout(cbOptions.getLong("timeout", 10000L))
+                        .setFallbackOnFailure(true)
+                        .setResetTimeout(cbOptions.getLong("reset-timeout", 30000L))
+        );
     }
 
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
@@ -147,9 +165,12 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     }
 
     private void dispatchRequests(RoutingContext context) {
+        logger.debug(printTime() + " Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
+        if(context.user() != null){
+            logger.info("Request was sent from User "+ context.user());
+        }
         int initialOffset = 5; // length of `/api/`
-        // run with circuit breaker in order to deal with failure
-        circuitBreaker.execute(future -> getAllEndpoints().setHandler(ar -> {
+        circuitBreaker.execute(promise -> getAllEndpoints().setHandler(ar -> {
             if (ar.succeeded()) {
                 List<Record> recordList = ar.result();
                 // get relative path and retrieve prefix to dispatch client
@@ -157,39 +178,41 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
                 if (path.length() <= initialOffset) {
                     notFound(context);
-                    future.complete();
+                    promise.complete();
                     return;
                 }
                 String prefix = (path.substring(initialOffset)
                         .split("/"))[0];
                 // generate new relative path
                 String newPath = path.substring(initialOffset + prefix.length());
-                // get one relevant HTTP client, may not exist
+                // a relevant http client endpoint
                 Optional<Record> client = recordList.stream()
                         .filter(record -> record.getMetadata().getString("api.name") != null)
                         .filter(record -> record.getMetadata().getString("api.name").equals(prefix))
-                        .findAny(); // simple load balance
+                        .findAny();
 
                 if (client.isPresent() && client.get().getLocation().containsKey("endpoint")) {
                     String endpoint = client.get().getLocation().getString("endpoint");
-                    doDispatch(context, "/"+prefix+newPath, endpoint, future);
-                    //ggf release discovery object
-                    //ServiceDiscovery.releaseServiceObject(discovery, client);
+                    doDispatch(context, "/"+prefix+newPath, endpoint, promise);
                 } else {
                     notFound(context);
-                    future.complete();
+                    promise.complete();
+                    logger.debug("Could not retrieve API Endpoint");
                 }
             } else {
-                future.fail(ar.cause());
+                promise.fail(ar.cause());
             }
         })).setHandler(ar -> {
             if (ar.failed()) {
                 badGateway(ar.cause(), context);
+                logger.info("Circuit Breaker timeout on Request " + context.request().absoluteURI());
             }
         });
     }
 
-    private void doDispatch(RoutingContext context, String path, String endpoint, Promise<Object> cbPromise) {
+    private void doDispatch(RoutingContext context, String path, String endpoint, Promise<Object> promise) {
+        String absURI = endpoint+path;
+        logger.info("Dispatching request to target service " + absURI);
 
         final String truststorepath = config().getString("truststore.path", "gateway_truststore.jks");
         final String truststorepass = config().getString("truststore.pass", "password");
@@ -205,7 +228,6 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                 .setVerifyHost(true);
 
         WebClient webClient = WebClient.create(vertx, options);
-        String absURI = endpoint+path;
         HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
         if (context.request().headers().size() >= 1){
             request.putHeaders(context.request().headers());
@@ -214,29 +236,24 @@ public class APIGatewayVerticle extends RestAPIVerticle {
             request.putHeader("user-principal", context.user().principal().encode());
         }
         if (context.getBody() == null){
-            request.send(ar -> {
-                handleAsyncResult(context, cbPromise, ar);
-            });
+            request.send(ar -> handleAsyncResult(context, promise, ar));
         } else {
-            request.sendBuffer(context.getBody(), ar -> {
-                handleAsyncResult(context, cbPromise, ar);
-            });
+            request.sendBuffer(context.getBody(), ar -> handleAsyncResult(context, promise, ar));
         }
     }
 
-    private void handleAsyncResult(RoutingContext context, Promise<Object> cbPromise, AsyncResult<HttpResponse<Buffer>> ar) {
+    private void handleAsyncResult(RoutingContext context, Promise<Object> promise, AsyncResult<HttpResponse<Buffer>> ar) {
         if (ar.succeeded()) {
             HttpResponse<Buffer> result = ar.result();
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
-            result.headers().forEach(header -> {
-                toRsp.putHeader(header.getKey(), header.getValue());
-            });
+            result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
             toRsp.end(result.body());
-            cbPromise.complete();
-
+            promise.complete();
+            logger.info("Request successfully handled");
         } else {
-            cbPromise.fail("No response");
+            promise.fail("No response; timeout");
+            logger.info(printTime() + " Timeout on request");
         }
     }
 
@@ -246,107 +263,10 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     }
 
     private Future<List<Record>> getAllEndpoints() {
-        Future<List<Record>> future = Future.future();
+        Promise<List<Record>> promise = Promise.promise();
         discovery.getRecords(record -> record.getType().equals(HttpEndpoint.TYPE),
-                future.completer());
-        return future;
-    }
-
-    // log methods
-
-    private void publishGatewayLog(String info) {
-        JsonObject message = new JsonObject()
-                .put("info", info)
-                .put("time", System.currentTimeMillis());
-        publishLogEvent("gateway", message);
-    }
-
-    private void publishGatewayLog(JsonObject msg) {
-        JsonObject message = msg.copy()
-                .put("time", System.currentTimeMillis());
-        publishLogEvent("gateway", message);
-    }
-
-    // auth
-
-    private void authCallback(OAuth2Auth oauth2, String hostURL, RoutingContext context) {
-        final String code = context.request().getParam("code");
-        // code is a require value
-        if (code == null) {
-            context.fail(400);
-            return;
-        }
-        final String redirectTo = context.request().getParam("redirect_uri");
-        final String redirectURI = hostURL + context.currentRoute().getPath() + "?redirect_uri=" + redirectTo;
-        oauth2.getToken(new JsonObject().put("code", code).put("redirect_uri", redirectURI), ar -> {
-            if (ar.failed()) {
-                logger.warn("Auth fail");
-                context.fail(ar.cause());
-            } else {
-                logger.info("Auth success");
-                context.setUser(ar.result());
-                context.response()
-                        .putHeader("Location", redirectTo)
-                        .setStatusCode(302)
-                        .end();
-            }
-        });
-    }
-
-    private void authUaaHandler(RoutingContext context) {
-        if (context.user() != null) {
-            JsonObject principal = context.user().principal();
-            /*
-            String username = null;  // TODO: Only for demo. Complete this in next version.
-            // String username = KeycloakHelper.preferredUsername(principal);
-            if (username == null) {
-                context.response()
-                        .putHeader("content-type", "application/json")
-                        .end(new Account().setId("TEST666").setUsername("Eric").toString()); // TODO: no username should be an error
-            } else {
-                Future<AccountService> future = Future.future();
-                EventBusService.getProxy(discovery, AccountService.class, future.completer());
-                future.compose(accountService -> {
-                    Future<Account> accountFuture = Future.future();
-                    accountService.retrieveByUsername(username, accountFuture.completer());
-                    return accountFuture.map(a -> {
-                        ServiceDiscovery.releaseServiceObject(discovery, accountService);
-                        return a;
-                    });
-                })
-                        .setHandler(resultHandlerNonEmpty(context)); // if user does not exist, should return 404
-            }
-
-             */
-        } else {
-            context.fail(401);
-        }
-    }
-
-    /*private void loginEntryHandler(RoutingContext context) {
-        context.response()
-                .putHeader("Location", generateAuthRedirectURI(buildHostURI()))
-                .setStatusCode(302)
-                .end();
-    }
-
-    private void logoutHandler(RoutingContext context) {
-        context.clearUser();
-        context.session().destroy();
-        context.response().setStatusCode(204).end();
-    }*/
-
-    /*private String generateAuthRedirectURI(String from) {
-        return oauth2.authorizeURL(new JsonObject()
-                .put("redirect_uri", from + "/callback?redirect_uri=" + from)
-                .put("scope", "")
-                .put("state", ""));
-    }*/
-
-    private String buildHostURI() {
-        int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT_GW);
-        final String host = config().getString("api.gateway.http.address.external", "localhost");
-        return String.format("https://%s:%d", host, port);
+                promise);
+        return promise.future();
     }
 
     private void mockDiscoveryEndpoints(){
@@ -365,13 +285,116 @@ public class APIGatewayVerticle extends RestAPIVerticle {
             discovery.publish(record, ar -> {
                 if (ar.succeeded()){
                     Record publishedRecord = ar.result();
+                    logger.debug("Service "+ publishedRecord.getName() + " published on endpoint " + publishedRecord.getLocation().getString("endpoint"));
                 } else {
-                    //couldnt create record
+                    logger.error(printTime() + " Service" + record.getName() + " could not be published");
                 }
             });
         }
+    }
+
+    private String printTime(){
+        return "Time: " + System.currentTimeMillis();
+    }
+
+    protected void enableLocalSession(Router router) {
+        //router.route().handler(CookieHandler.create());
+        router.route().handler(SessionHandler.create(
+                LocalSessionStore.create(vertx, "shopping.user.session")));
+    }
+
+    protected void badRequest(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(400)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected void notFound(RoutingContext context) {
+        context.response().setStatusCode(404)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("message", "not_found").encodePrettily());
+    }
+
+    protected void internalError(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(500)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected void badGateway(Throwable ex, RoutingContext context) {
+        ex.printStackTrace();
+        context.response()
+                .setStatusCode(502)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", "bad_gateway")
+                        //.put("message", ex.getMessage())
+                        .encodePrettily());
+    }
 
 
+    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+        Record record = HttpEndpoint.createRecord(name, host, port, "/",
+                new JsonObject().put("api.name", config().getString("api.name", ""))
+        );
+        return publish(record);
+    }
 
+    protected Future<Void> publishApiGateway(String host, int port) {
+        Record record = HttpEndpoint.createRecord("api-gateway", true, host, port, "/", null)
+                .setType("api-gateway");
+        return publish(record);
+    }
+
+    protected Future<Void> publishJDBCDataSource(String name, JsonObject location) {
+        Record record = JDBCDataSource.createRecord(name, location, new JsonObject());
+        return publish(record);
+    }
+
+    private Future<Void> publish(Record record) {
+        if (discovery == null) {
+            try {
+                start();
+            } catch (Exception e) {
+                throw new IllegalStateException("Cannot create discovery service");
+            }
+        }
+        Promise<Void> promise = Promise.promise();
+        // publish the service
+        discovery.publish(record, ar -> {
+            if (ar.succeeded()) {
+                registeredRecords.add(record);
+                logger.info("Service <" + ar.result().getName() + "> published");
+                promise.complete();
+            } else {
+                promise.fail(ar.cause());
+            }
+        });
+        return promise.future();
+    }
+
+    @Override
+    public void stop(Promise<Void> promise) throws Exception {
+        List<Promise> promises = new ArrayList<>();
+        registeredRecords.forEach(record -> {
+            Promise<Void> cleanupPromise = Promise.promise();
+            promises.add(cleanupPromise);
+            discovery.unpublish(record.getRegistration(), cleanupPromise);
+        });
+        List<Future> allFutures = new ArrayList<>();
+        promises.forEach(p -> allFutures.add(p.future()));
+        if (promises.isEmpty()) {
+            discovery.close();
+            promise.complete();
+        } else {
+            CompositeFuture.all(allFutures)
+                    .setHandler(ar -> {
+                        discovery.close();
+                        if (ar.failed()) {
+                            promise.fail(ar.cause());
+                        } else {
+                            promise.complete();
+                        }
+                    });
+        }
     }
 }
