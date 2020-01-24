@@ -12,6 +12,9 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
+import io.vertx.ext.healthchecks.HealthCheckHandler;
+import io.vertx.ext.healthchecks.HealthChecks;
+import io.vertx.ext.healthchecks.Status;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpRequest;
@@ -25,10 +28,22 @@ import io.vertx.servicediscovery.types.HttpEndpoint;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class APIGatewayVerticle extends RestAPIVerticle {
 
-    private static final int DEFAULT_PORT = 8787;
+    private static final int DEFAULT_PORT_GW = 8787;
+    private static final int DEFAULT_PORT_TLC = 8086;
+    private static final int DEFAULT_PORT_EV = 8087;
+    private static final int DEFAULT_PORT_DB = 3306;
+    private static final int DEFAULT_PORT_KC = 38080;
+
+    private final String tlcService = "traffic-light-service";
+    private final String gwService = "api-gateway";
+    private final String evService = "ev-service";
+    private final String dbService = "database";
+    private final String keycloakService = "keycloak";
 
     private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
@@ -45,9 +60,11 @@ public class APIGatewayVerticle extends RestAPIVerticle {
 
         // get HTTP host and port from configuration, or use default value
         String host = config().getString("api.gateway.http.address", "localhost");
-        int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT);
+        int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT_GW);
 
         Router router = Router.router(vertx);
+        HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
+        registerHealthEndpoints(healthHandler);
         // cookie and session handler
         enableLocalSession(router);
 
@@ -78,7 +95,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>Hello vertx</h1>");
         });
-
+        router.get("/health").handler(healthHandler);
         router.route("/assets/*").handler(StaticHandler.create("assets"));
         // api dispatcher
         //router.route("/api/*").handler(authHandler);
@@ -110,6 +127,23 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                         promise.fail(ar.cause());
                     }
                 });
+    }
+
+    private void registerHealthEndpoints(HealthCheckHandler healthHandler){
+        for (String service : Stream.of(tlcService, gwService, evService, dbService, keycloakService).collect(Collectors.toList())){
+            //TODO this only checks if discovery has this service, not if this is reachable -> makes only sense with kubernetes
+            healthHandler.register(service,
+                    future -> HttpEndpoint.getClient(discovery,
+                            (rec) -> service.equals(rec.getName()),
+                            client -> {
+                                if (client.failed()) {
+                                    future.fail(client.cause());
+                                } else {
+                                    client.result().close();
+                                    future.complete(Status.OK());
+                                }
+                            }));
+        }
     }
 
     private void dispatchRequests(RoutingContext context) {
@@ -310,35 +344,34 @@ public class APIGatewayVerticle extends RestAPIVerticle {
     }*/
 
     private String buildHostURI() {
-        int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT);
+        int port = config().getInteger("api.gateway.http.port", DEFAULT_PORT_GW);
         final String host = config().getString("api.gateway.http.address.external", "localhost");
         return String.format("https://%s:%d", host, port);
     }
 
     private void mockDiscoveryEndpoints(){
         //TODO make discovery work
-        //API gateway default port 8787
         final boolean ssl = true;
+        final String DEFAULT_HOSTNAME = "localhost";
+        final String DEFAULT_WEBROOT = "";
 
-        final String tlcDefaultHost = "localhost";
-        final int tlcDefaultPort = 8086;
-        final String tlcServiceName = "traffic-light-service";
-        final String tlcRoot = "";
+        Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights"));
+        Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
+        Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
+        Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
+        Record record5 = HttpEndpoint.createRecord(keycloakService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_KC, DEFAULT_WEBROOT, new JsonObject());
+        //publish all records
+        for (Record record: Stream.of(record1, record2, record3, record4, record5).collect(Collectors.toList())){
+            discovery.publish(record, ar -> {
+                if (ar.succeeded()){
+                    Record publishedRecord = ar.result();
+                } else {
+                    //couldnt create record
+                }
+            });
+        }
 
-        final String evDefaultHost = "localhost";
-        final int evDefaultPort = 8087;
-        final String evServiceName = "ev-service";
 
-        final String keycloakDefaultHost = "localhost";
-        final int keycloakDefaultPort = 38080;
 
-        Record record = HttpEndpoint.createRecord(tlcServiceName, ssl, tlcDefaultHost, tlcDefaultPort, tlcRoot, new JsonObject().put("api.name", "lights"));
-        discovery.publish(record, ar -> {
-            if (ar.succeeded()){
-                Record publishedRecord = ar.result();
-            } else {
-                //couldnt create record
-            }
-        });
     }
 }
