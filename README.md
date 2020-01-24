@@ -18,7 +18,8 @@ TODO list
 * If possible: Refactor for Testing, start writing tests
 * If possible: Encrypt DB communication
 * If possible: Enable Kubernetes Discovery and deploy with Kubernetes
-
+* **BEFORE RELEASE: Scan with SpotBugs & fix; Remove all TODOs; handle all Exceptions & Warnings; remove random commented out stuff or development notes; check no passwords get leaked;**
+* **BEFORE RELEASE: Check good code quality, readable, short methods, decoupled, seperation of concerns etc.**
 
 RELEASE notes
 =============
@@ -66,10 +67,12 @@ docker run -d -i -t -p 8086:8086 vertx/tlc
 
 OR `docker-compose up`
 * Deploy Keycloak, Database, Frontend (nginx)
-#TODO alles einfach per docker-compose
+
+TODO alles einfach per docker-compose
 
 * Optionally: Deploy with Kubernetes
-#TODO hier brauchen wir dann die docker commandos von oben vermutlich
+
+TODO hier brauchen wir dann die docker commandos von oben vermutlich
 
 Additional Information about the Project
 =============================
