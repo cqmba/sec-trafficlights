@@ -23,8 +23,6 @@ public interface TLControllerService {
 
     boolean removeTL(int tlId);
 
-    boolean updateTL(int tlId, TrafficLight tl);
-
     TrafficLight changeColor(int tlId, TLColor color);
 
     boolean changeToGreen(int tlId);

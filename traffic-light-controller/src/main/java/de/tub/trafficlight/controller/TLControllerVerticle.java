@@ -1,24 +1,33 @@
 package de.tub.trafficlight.controller;
 
-import de.tub.common.RestAPIVerticle;
 import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.servicediscovery.Record;
+import io.vertx.servicediscovery.ServiceDiscovery;
+import io.vertx.servicediscovery.types.HttpEndpoint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
-public class TLControllerVerticle extends RestAPIVerticle {
+public class TLControllerVerticle extends AbstractVerticle {
 
     private static final String SERVICE_NAME = "traffic-light-service";
     private static final String API_STATES = "/lights";
@@ -26,6 +35,8 @@ public class TLControllerVerticle extends RestAPIVerticle {
     private static final String API_SINGLE_COLOR = "/lights/:tlId/colors";
 
     private TLControllerService service;
+    private ServiceDiscovery discovery;
+    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
@@ -33,6 +44,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
     public void start(Promise<Void> promise) throws Exception {
         super.start(promise);
         //TODO retrieve config
+        discovery = ServiceDiscovery.create(vertx);
 
         this.service = TLControllerService.createService(vertx);
 
@@ -66,9 +78,7 @@ public class TLControllerVerticle extends RestAPIVerticle {
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
         createHttpServer(router,host,port, options)
-                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
-                .setHandler(promise);
-
+                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port));
     }
 
     private void apiPutSingle(RoutingContext routingContext) {
@@ -91,21 +101,11 @@ public class TLControllerVerticle extends RestAPIVerticle {
         if (color != null){
             oldTl.setColor(color);
         } else {
-            routingContext.fail(400);
             logger.debug("Color not matching possible options");
+            badRequest(routingContext, new Exception("Color not matching possible options"));
             return;
         }
-        if (service.updateTL(id, oldTl)){
-            //TODO change mode isAssigned
-            routingContext.response()
-                    .setStatusCode(200)
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(oldTl));
-        } else {
-            logger.error("Error: Request " + routingContext.request().absoluteURI() + " from User " + routingContext.user().toString());
-            routingContext.fail(404);
-        }
-
+        doChangeColor(routingContext, id, color);
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
@@ -114,18 +114,21 @@ public class TLControllerVerticle extends RestAPIVerticle {
         try {
             id = Integer.parseInt(tlId);
         } catch (NumberFormatException e) {
-            routingContext.response().setStatusCode(404).end();
+            logger.debug("ID could not be parsed to int");
+            badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
         if(service.getSingleTLState(id).isPresent() && service.getSingleTLState(id).get().getGroup() >= 2){
             if (service.removeTL(id)) {
+                logger.info("Traffic Light deleted " + id);
                 routingContext.response().setStatusCode(204).end();
             } else {
-                routingContext.fail(400);
+                logger.error("Unable to delete Traffic Light");
+                internalError(routingContext, new Exception("Unable to delete Traffic Light"));
             }
         } else {
-            routingContext.fail(400);
             logger.debug("Intersection 1 Traffic Light cannot be deleted");
+            badRequest(routingContext, new Exception("Intersection 1 Traffic Light cannot be deleted"));
         }
 
     }
@@ -133,24 +136,30 @@ public class TLControllerVerticle extends RestAPIVerticle {
     private void apiPostSingle(RoutingContext routingContext) {
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
-        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", "UNSPECIFIED"));
+        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", TLPosition.UNSPECIFIED.toString()));
         TLType type = getEnumFromString(TLType.class, json.getString("type", "VEHICLE"));
         TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
+        if (color == null || type == null || position == null){
+            logger.debug("Type, Position or Color not passed correctly");
+            badRequest(routingContext, new Exception("Type, Position or Color not passed correctly"));
+            return;
+        }
         int group = json.getInteger("group");
         int id;
         try {
             id = Integer.parseInt(tlId);
         } catch (Exception ex){
-            routingContext.fail(400);
-            logger.debug("Id was no int");
+            logger.debug("ID could not be parsed to int");
+            badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
         if (service.getSingleTLState(id).isPresent() || group == 1){
-            routingContext.fail(400);
-            logger.debug("Already exists or wrong group");
+            logger.debug("Traffic Light with given ID already exits or group ID is bad");
+            badRequest(routingContext, new Exception("Traffic Light with given ID already exits or group ID is bad"));
             return;
         }
         TrafficLight created = service.addTL(id, color, position, type, group);
+        logger.debug("New traffic light created " + created.getId());
         routingContext.response()
                 .setStatusCode(201)
                 .putHeader("content-type", "application/json; charset=utf-8")
@@ -163,12 +172,13 @@ public class TLControllerVerticle extends RestAPIVerticle {
         try {
             id = Integer.parseInt(tlId);
         } catch (Exception ex){
-            routingContext.fail(400);
-            logger.debug("Id was no int");
+            logger.debug("ID could not be parsed to int");
+            badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
         if (service.getSingleTLState(id).isEmpty()){
-            routingContext.fail(404, new Exception("Not Found"));
+            logger.debug("Traffic Light for given ID could not be found");
+            notFound(routingContext);
             return;
         }
         routingContext.response()
@@ -183,35 +193,39 @@ public class TLControllerVerticle extends RestAPIVerticle {
                     .putHeader("content-type", "application/json; charset=utf-8")
                     .end(Json.encodePrettily(tlList));
         } catch (Exception ex){
-            routingContext.fail(400);
+            internalError(routingContext, new Exception("Unable to Retrieve the traffic lights"));
         }
     }
 
     private void apiChangeColor(RoutingContext routingContext){
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
-        //TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", "UNSPECIFIED"));
         TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
+        if (color == null){
+            logger.debug("Color not matching possible options");
+            badRequest(routingContext, new Exception("Color not matching possible options"));
+            return;
+        }
         int group = json.getInteger("group");
         int id;
         try {
             id = Integer.parseInt(tlId);
         } catch (Exception ex){
-            routingContext.fail(400);
-            logger.debug("Id was no int");
+            logger.debug("ID could not be parsed to int");
+            badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
         if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
-            routingContext.fail(404);
+            logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
+            badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
             return;
         }
-        if (color == null){
-            routingContext.fail(400);
-            logger.debug("Color not matching possible options");
-            return;
-        }
+        doChangeColor(routingContext, id, color);
+    }
+
+    private void doChangeColor(RoutingContext routingContext, int id, TLColor color){
         //now we have working ID, group and new color
-        if(isEmergencyVehicleSensor()){
+        if(isEmergencyVehicleSensor() && color.equals(TLColor.GREEN)){
             if(isAuthorized()){
                 if (service.changeToGreen(id)){
                     routingContext.response()
@@ -219,24 +233,23 @@ public class TLControllerVerticle extends RestAPIVerticle {
                             .end(Json.encodePrettily(new JsonObject().put("message", "success")));
                 } else {
                     logger.debug("Couldnt execute green Light change.");
-                    routingContext.fail(400);
+                    internalError(routingContext, new Exception("Unable to switch to green light"));
                 }
             } else {
                 logger.debug("Unauthorized Request");
-                routingContext.fail(400);
+                badRequest(routingContext, new Exception("Unauthorized Request"));
             }
         } else {
             logger.debug("TLC-User Requested Color Assignment");
             routingContext.response()
                     .putHeader("content-type", "application/json; charset=utf-8")
                     .end(Json.encodePrettily(service.changeColor(id, color)));
-
         }
     }
 
     //TODO implement
     private boolean isEmergencyVehicleSensor() {
-        return true;
+        return false;
     }
 
     //TODO implement
@@ -249,25 +262,91 @@ public class TLControllerVerticle extends RestAPIVerticle {
             try {
                 return Enum.valueOf(c, string.trim().toUpperCase());
             } catch(IllegalArgumentException ex) {
-                //TODO handle
+                logger.info("Unable to convert String to Enum");
             }
         }
         return null;
     }
 
-    /*private void test(RoutingContext context){
-        Optional<Integer> integer = getValueFromRequestParams("id", context.request().params(), Integer.class);
+    protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
+        Promise<HttpServer> httpServerPromise = Promise.promise();
+        vertx.createHttpServer(options)
+                .requestHandler(router)
+                .listen(port, host, httpServerPromise);
+        logger.info("Http Server started at " + host +port);
+        return httpServerPromise.future().map(r -> null);
     }
 
-    private static <T> Optional<T> getValueFromRequestParams(String key, MultiMap params, Class<T> c){
-        if (params.contains(key)){
-            String value = params.get(key);
-            if (c.isEnum()){
-                if (
-                return Optional.ofNullable(getEnumFromString(c, value));
-            } else if (c.)
-        } else {
-            return Optional.empty();
+    protected void badRequest(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(400)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected void notFound(RoutingContext context) {
+        context.response().setStatusCode(404)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("message", "not_found").encodePrettily());
+    }
+
+    protected void internalError(RoutingContext context, Throwable ex) {
+        context.response().setStatusCode(500)
+                .putHeader("content-type", "application/json")
+                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
+    }
+
+    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+        Record record = HttpEndpoint.createRecord(name, host, port, "/",
+                new JsonObject().put("api.name", config().getString("api.name", ""))
+        );
+        return publish(record);
+    }
+
+    private Future<Void> publish(Record record) {
+        if (discovery == null) {
+            try {
+                start();
+            } catch (Exception e) {
+                throw new IllegalStateException("Cannot create discovery service");
+            }
         }
-    }*/
+        Promise<Void> promise = Promise.promise();
+        // publish the service
+        discovery.publish(record, ar -> {
+            if (ar.succeeded()) {
+                registeredRecords.add(record);
+                logger.info("Service <" + ar.result().getName() + "> published");
+                promise.complete();
+            } else {
+                promise.fail(ar.cause());
+            }
+        });
+        return promise.future();
+    }
+
+    @Override
+    public void stop(Promise<Void> promise) {
+        List<Promise> promises = new ArrayList<>();
+        registeredRecords.forEach(record -> {
+            Promise<Void> cleanupPromise = Promise.promise();
+            promises.add(cleanupPromise);
+            discovery.unpublish(record.getRegistration(), cleanupPromise);
+        });
+        List<Future> allFutures = new ArrayList<>();
+        promises.forEach(p -> allFutures.add(p.future()));
+        if (promises.isEmpty()) {
+            discovery.close();
+            promise.complete();
+        } else {
+            CompositeFuture.all(allFutures)
+                    .setHandler(ar -> {
+                        discovery.close();
+                        if (ar.failed()) {
+                            promise.fail(ar.cause());
+                        } else {
+                            promise.complete();
+                        }
+                    });
+        }
+    }
 }

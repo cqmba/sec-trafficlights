@@ -30,7 +30,7 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     public List<TrafficLight> getAllTrafficLights() {
-        return tlRepo.values().stream().collect(Collectors.toList());
+        return new ArrayList<>(tlRepo.values());
     }
 
     @Override
@@ -47,33 +47,24 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     @Override
     public boolean removeTrafficLight(int id) {
         TrafficLight tl = tlRepo.remove(id);
-        if (tl != null) return true;
-        else return false;
+        return tl != null;
     }
 
     @Override
     public boolean updateTrafficLight(int id, TrafficLight tl) {
         if (getTrafficLight(id).isPresent()){
             TrafficLight tlUpdated = tlRepo.replace(id, tl);
-            if (tlUpdated != null) {
-                return true;
-            }
+            return tlUpdated != null;
         }
         return false;
     }
 
     @Override
-    public boolean updateTrafficLightList(List<TrafficLight> tlList) {
-        //TODO handle update as a single transaction and revert possibly
-        try {
-            for (TrafficLight tl : tlList) {
-                if (!updateTrafficLight(tl.getId(), tl)) {
-                    throw new Exception("Error: Failed to update TL");
-                }
+    public void updateTrafficLightList(List<TrafficLight> tlList) {
+        for (TrafficLight tl : tlList) {
+            if (!updateTrafficLight(tl.getId(), tl)) {
+                logger.error("Error: Failed to update TL");
             }
-            return true;
-        } catch (Exception e) {
-            return false;
         }
     }
 
@@ -100,10 +91,9 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     @Override
-    public TLIncident addIncident(TLIncident incident) {
+    public void addIncident(TLIncident incident) {
         logger.debug("New incident added to Persistence: " + incident.getPosition().toString());
         incidentRepo.put(COUNTER.getAndIncrement(), incident);
-        return incident;
     }
 
     @Override
@@ -138,20 +128,19 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
             logger.debug("Incident not resolved yet");
             return incident;
         }
-        //multiple matches resolved
         return Optional.empty();
     }
 
     @Override
-    public boolean resolveSideRoadIncidents() {
+    public void resolveSideRoadIncidents() {
         List<TLIncident> toResolve = getFilteredIncidents(filter -> filter.getState().equals(TLIncident.STATE.UNRESOLVED) && filter.getPosition().isSide());
-        return resolveList(toResolve);
+        resolveList(toResolve);
     }
 
     @Override
-    public boolean resolveMainRoadIncidents(){
+    public void resolveMainRoadIncidents(){
         List<TLIncident> toResolve = getFilteredIncidents(filter -> filter.getState().equals(TLIncident.STATE.UNRESOLVED) && filter.getPosition().isMain());
-        return resolveList(toResolve);
+        resolveList(toResolve);
     }
 
     private int resolveSingle(TLIncident incident){
@@ -168,15 +157,9 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
         return resolved;
     }
 
-    private boolean resolveList(List<TLIncident> toResolve) {
-        if (toResolve.size() >= 1){
-            int resolved = 0;
-            for (TLIncident incident : toResolve){
-                resolved += resolveSingle(incident);
-            }
-            return toResolve.size() == resolved;
-        } else {
-            return true;
+    private void resolveList(List<TLIncident> toResolve) {
+        for (TLIncident incident : toResolve){
+            resolveSingle(incident);
         }
     }
 
