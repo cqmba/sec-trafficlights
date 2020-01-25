@@ -105,17 +105,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("Color not matching possible options"));
             return;
         }
-        if (service.updateTL(id, oldTl)){
-            //TODO change mode isAssigned
-            routingContext.response()
-                    .setStatusCode(200)
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(service.getSingleTLState(id)));
-        } else {
-            logger.error("Error: Request " + routingContext.request().absoluteURI() + " from User " + routingContext.user().toString());
-            routingContext.fail(404);
-        }
-
+        doChangeColor(routingContext, id, color);
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
@@ -231,6 +221,10 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
             return;
         }
+        doChangeColor(routingContext, id, color);
+    }
+
+    private void doChangeColor(RoutingContext routingContext, int id, TLColor color){
         //now we have working ID, group and new color
         if(isEmergencyVehicleSensor() && color.equals(TLColor.GREEN)){
             if(isAuthorized()){
@@ -251,13 +245,12 @@ public class TLControllerVerticle extends AbstractVerticle {
             routingContext.response()
                     .putHeader("content-type", "application/json; charset=utf-8")
                     .end(Json.encodePrettily(service.changeColor(id, color)));
-
         }
     }
 
     //TODO implement
     private boolean isEmergencyVehicleSensor() {
-        return true;
+        return false;
     }
 
     //TODO implement

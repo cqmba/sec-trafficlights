@@ -1,5 +1,7 @@
 package de.tub.trafficlight.controller.logic;
 
+import de.tub.trafficlight.controller.entity.TLColor;
+import de.tub.trafficlight.controller.entity.TLMode;
 import de.tub.trafficlight.controller.entity.TLState;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
@@ -11,6 +13,10 @@ public interface TLIntersectionLogicService {
     static TLIntersectionLogicService getInstance(int groupId, TLPersistenceService persistence){
         return new TLIntersectionLogicServiceImpl(groupId, persistence);
     }
+
+    TLMode getMode();
+
+    boolean setMode(TLMode mode);
 
     void doTransition();
 

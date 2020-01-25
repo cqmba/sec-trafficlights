@@ -3,9 +3,7 @@ package de.tub.trafficlight.controller.impl;
 import de.tub.trafficlight.controller.TLControllerService;
 import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.logic.TLIntersectionLogicService;
-import de.tub.trafficlight.controller.logic.TLIntersectionLogicServiceImpl;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
-import de.tub.trafficlight.controller.persistence.TLPersistenceServiceImpl;
 import io.vertx.core.Vertx;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +39,7 @@ public class TLControllerServiceImpl implements TLControllerService {
             }
             logger.debug("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
         }catch (Exception ex){
-            //TODO handle
+            logger.error(ex.getMessage());
         }
         vertx.setTimer(25000, event -> {
             intersection.doTransition();
@@ -60,7 +58,25 @@ public class TLControllerServiceImpl implements TLControllerService {
                 this.interrupt = false;
                 counter = 0;
                 vertx.cancelTimer(event);
-                executeTransitionAndSetNewTimer();
+                switch (intersection.getMode()){
+                    case SCHEDULED:{
+                        logger.debug("MODE SCHEDULED: Normal Operation");
+                        executeTransitionAndSetNewTimer();
+                        break;
+                    }
+                    case ASSIGNED:{
+                        int waitToReset = 60000;
+                        logger.debug("MODE ASSIGNED: Waiting for " + waitToReset + "ms to reset to normal Operation");
+                        vertx.setTimer(waitToReset, timer -> {
+                            //reset mode
+                            intersection.setMode(TLMode.SCHEDULED);
+                            executeTransitionAndSetNewTimer();
+                        });
+                        break;
+                    }
+                    //maintenance
+                    default: timePeriodic(60000);
+                }
             }
         });
     }
@@ -80,12 +96,7 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     @Override
     public List<TrafficLight> getTLList() {
-        try{
-            return persistence.getAllTrafficLights();
-        }catch (Exception ex){
-            //TODO ErrorHandling
-            return null;
-        }
+        return persistence.getAllTrafficLights();
     }
 
     @Override
@@ -105,13 +116,17 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     @Override
     public TrafficLight changeColor(int tlId, TLColor color) {
-        //TODO what should this do in the backend? Calculate new fitting state or just hold the state?
         if(persistence.getTrafficLight(tlId).isPresent()){
-            TrafficLight tl = persistence.getTrafficLight(tlId).get();
-            tl.setColor(color);
-            return persistence.getTrafficLight(tlId).get();
+            TrafficLight toUpdate = persistence.getTrafficLight(tlId).get();
+            toUpdate.setColor(color);
+            persistence.updateTrafficLight(tlId,toUpdate);
+            intersection.setMode(TLMode.ASSIGNED);
+            interrupt = true;
+            TrafficLight updated = persistence.getTrafficLight(tlId).get();
+            logger.debug("Traffic light updated " + tlId);
+            return updated;
         } else {
-            //TODO handle ex
+            logger.error("Traffic Light " +tlId + " is not present");
             return null;
         }
     }
@@ -135,40 +150,4 @@ public class TLControllerServiceImpl implements TLControllerService {
         }
         return false;
     }
-/*
-    private boolean haveToChangeSchedule(TrafficLight tl){
-        if (tl.getPosition().equals(TLPosition.MAIN_ROAD_EAST) || tl.getPosition().equals(TLPosition.MAIN_ROAD_WEST) ){
-            if (intersection.getCurrentIntersectionState().equals(TLState.S0_MG_SR_PM)){
-                return false;
-            }
-        } else if (tl.getPosition().equals(TLPosition.SIDE_ROAD_NORTH)  || tl.getPosition().equals(TLPosition.SIDE_ROAD_SOUTH) ){
-            if (intersection.getCurrentIntersectionState().equals(TLState.S3_MR_SG_PS){
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void handleIncidents(){
-        while (evIncidents.size() >= 1){
-            //resolve immediate requests for green on green
-            else {
-                //TODO safe increasing
-                TLPosition tlPosition = evIncidents.get(0);
-                this.nextIncident = Promise.promise();
-                nextIncident.handle();
-                //TODO wait out current timer and inject into following
-                if(tlPosition.equals(TLPosition.MAIN_ROAD_EAST) || tlPosition.equals(TLPosition.MAIN_ROAD_WEST)){
-                    intersection.doTransition(true, false);
-                    logger.debug("Executed Emergency Green Light for Emergency Vehicle triggered by Sensor on " + tl.getPosition().toString());
-                    logger.debug("New Intersection State " + intersection.getCurrentIntersectionState());
-                    return true;
-                } else if (tlPosition.equals(TLPosition.SIDE_ROAD_NORTH) || tlPosition.equals(TLPosition.SIDE_ROAD_SOUTH)){
-                    intersection.doTransition(false, true);
-                    return true;
-                }
-            }
-
-        }
-    }*/
 }

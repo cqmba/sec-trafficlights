@@ -61,16 +61,12 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
 
     @Override
     public boolean updateTrafficLightList(List<TrafficLight> tlList) {
-        try {
-            for (TrafficLight tl : tlList) {
-                if (!updateTrafficLight(tl.getId(), tl)) {
-                    throw new Exception("Error: Failed to update TL");
-                }
+        for (TrafficLight tl : tlList) {
+            if (!updateTrafficLight(tl.getId(), tl)) {
+                logger.error("Error: Failed to update TL");
             }
-            return true;
-        } catch (Exception e) {
-            return false;
         }
+        return true;
     }
 
     @Override

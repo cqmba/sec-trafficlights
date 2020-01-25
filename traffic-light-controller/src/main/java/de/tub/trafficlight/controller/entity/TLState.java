@@ -256,7 +256,7 @@ public enum TLState {
     },
     STOPS {
         @Override
-        public TLState nextState(boolean isEmergencyMain, boolean isEmergendySide) {
+        public TLState nextState(boolean isEmergencyMain, boolean isEmergencySide) {
             return S3_MR_SG_PS;
         }
 
@@ -284,9 +284,40 @@ public enum TLState {
         public int getCurrentStandardTransitionTimeMs() {
             return 5000;
         }
+    },
+    EMERGENCY {
+        @Override
+        public TLState nextState(boolean isEmergencyMain, boolean isEmergencySide) {
+            return S0_MG_SR_PM;
+        }
+
+        @Override
+        public TLColor getCurrentMainRoadColor() {
+            return TLColor.YELLOWBLINKING;
+        }
+
+        @Override
+        public TLColor getCurrentSideRoadColor() {
+            return TLColor.YELLOWBLINKING;
+        }
+
+        @Override
+        public TLColor getCurrentMainPedestrianColor() {
+            return TLColor.YELLOWBLINKING;
+        }
+
+        @Override
+        public TLColor getCurrentSidePedestrianColor() {
+            return TLColor.YELLOWBLINKING;
+        }
+
+        @Override
+        public int getCurrentStandardTransitionTimeMs() {
+            return 60000;
+        }
     };
 
-    public abstract TLState nextState(boolean isEmergencyMain, boolean isEmergendySide);
+    public abstract TLState nextState(boolean isEmergencyMain, boolean isEmergencySide);
     public abstract TLColor getCurrentMainRoadColor();
     public abstract TLColor getCurrentSideRoadColor();
     public abstract TLColor getCurrentMainPedestrianColor();
