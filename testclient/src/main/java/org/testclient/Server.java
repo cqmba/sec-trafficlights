@@ -26,8 +26,8 @@ public class Server extends AbstractVerticle {
     server.requestHandler(req -> {
     	System.out.println("Hello req");
     	OAuth2Auth oauth2 = OAuth2Auth.create(vertx, OAuth2FlowType.CLIENT, new OAuth2ClientOptions()
-    			  .setClientID("vertx-test")
-    			  .setClientSecret("98ba74b5-e0ff-4a23-b59e-b4e9c8658d09")
+    			  .setClientID("vertx-test2")
+    			  .setClientSecret("ab4bf0ae-6b51-47e6-ba89-4455c5a0a825")
     			  .setTokenPath("http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token")
     			);
     	

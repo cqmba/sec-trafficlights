@@ -26,6 +26,10 @@ import io.vertx.servicediscovery.types.HttpEndpoint;
 import java.util.List;
 import java.util.Optional;
 
+//import org.keycloak.RSATokenVerifier;
+//import org.keycloak.common.VerificationException;
+//import org.keycloak.representations.AccessToken;
+
 public class APIGatewayVerticle extends RestAPIVerticle {
 
     private static final int DEFAULT_PORT = 8787;
@@ -54,9 +58,13 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         		  .put("realm", "vertx")
         		  .put("auth-server-url", "http://localhost:8080/auth")
         		  .put("ssl-required", "external")
-        		  .put("resource", "vertx-tlc")
-        		  .put("credentials", new JsonObject().put("secret", "f1025f5a-8170-4d67-b851-71ee71c5a97c"))
-        		  .put("confidential-port", 0);
+        		  .put("resource", "vertx-tlc2")
+        		  .put("verify-token-audience", true)
+        		  .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
+        		  .put("use-resource-role-mappings", true)
+        		  .put("confidential-port", 0)
+        		  .put("policy-enforcer", new JsonObject());
+        
         
         // body handler
         router.route().handler(BodyHandler.create());
@@ -67,6 +75,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         // create OAuth 2 instance for Keycloak
        oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
        OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
+       
        authHandler.setupCallback(router.get("/callback"));
 
         //router.route().handler(UserSessionHandler.create(oauth2));
@@ -83,7 +92,16 @@ public class APIGatewayVerticle extends RestAPIVerticle {
             response
                     .putHeader("content-type", "text/html")
                     .end("<h1>Hello protect</h1>");
+            
+//            try {
+//				AccessToken token = RSATokenVerifier.create(routingContext.user().principal().getString("access_token")).getToken();
+//				System.out.println(token.getRealmAccess());
+//			} catch (VerificationException e) {
+//				System.err.println("error optaining token:");
+//				e.printStackTrace();
+//        }
         });
+        
         
         //router.get("/uaa").handler(this::authUaaHandler);
         //router.get("/login").handler(this::loginEntryHandler);
