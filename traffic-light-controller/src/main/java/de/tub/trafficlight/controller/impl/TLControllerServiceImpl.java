@@ -25,8 +25,8 @@ public class TLControllerServiceImpl implements TLControllerService {
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
     public TLControllerServiceImpl(Vertx vertx){
-        persistence = new TLPersistenceServiceImpl();
-        intersection = new TLIntersectionLogicServiceImpl(MAIN_INTERSECTION_GROUP, persistence);
+        persistence = TLPersistenceService.getInstance();
+        intersection = TLIntersectionLogicService.getInstance(MAIN_INTERSECTION_GROUP, persistence);
         this.vertx = vertx;
         this.interrupt = false;
         counter = 0;

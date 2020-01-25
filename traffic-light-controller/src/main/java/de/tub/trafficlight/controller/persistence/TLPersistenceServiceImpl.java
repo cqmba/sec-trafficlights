@@ -30,7 +30,7 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     public List<TrafficLight> getAllTrafficLights() {
-        return tlRepo.values().stream().collect(Collectors.toList());
+        return new ArrayList<>(tlRepo.values());
     }
 
     @Override
@@ -47,24 +47,20 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     @Override
     public boolean removeTrafficLight(int id) {
         TrafficLight tl = tlRepo.remove(id);
-        if (tl != null) return true;
-        else return false;
+        return tl != null;
     }
 
     @Override
     public boolean updateTrafficLight(int id, TrafficLight tl) {
         if (getTrafficLight(id).isPresent()){
             TrafficLight tlUpdated = tlRepo.replace(id, tl);
-            if (tlUpdated != null) {
-                return true;
-            }
+            return tlUpdated != null;
         }
         return false;
     }
 
     @Override
     public boolean updateTrafficLightList(List<TrafficLight> tlList) {
-        //TODO handle update as a single transaction and revert possibly
         try {
             for (TrafficLight tl : tlList) {
                 if (!updateTrafficLight(tl.getId(), tl)) {
@@ -138,7 +134,6 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
             logger.debug("Incident not resolved yet");
             return incident;
         }
-        //multiple matches resolved
         return Optional.empty();
     }
 

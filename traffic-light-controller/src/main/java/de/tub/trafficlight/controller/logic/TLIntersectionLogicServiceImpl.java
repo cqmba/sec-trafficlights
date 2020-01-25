@@ -3,7 +3,6 @@ package de.tub.trafficlight.controller.logic;
 import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
 import de.tub.trafficlight.controller.schedule.TLSchedule;
-import io.vertx.core.Promise;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -20,49 +19,41 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
     private TrafficLight main_west, main_east, side_north, side_south, ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_north, ped4_east;
 
-    private final TLPosition pos_mw = TLPosition.MAIN_ROAD_WEST;
-    private final TLPosition pos_me = TLPosition.MAIN_ROAD_EAST;
-    private final TLPosition pos_sn = TLPosition.SIDE_ROAD_NORTH;
-    private final TLPosition pos_ss = TLPosition.SIDE_ROAD_SOUTH;
-
-    private TLMode mw_mode, me_mode, sn_mode, ss_mode;
-
-    private TLHealth mw_health, me_health, sn_health, ss_health;
-
-    private TLSchedule mw_schedule, me_schedule, sn_schedule, ss_schedule;
-
     private TLState state;
     private int groupId;
 
-    private final TLType type_ped = TLType.PEDESTRIAN;
-    private final TLType type_car = TLType.VEHICLE;
-
     private List<TrafficLight> roadLights, pedLights;
 
-    private Optional<TLIncident> incident;
+    private Optional<TLIncident> optional;
     private TLPersistenceService persistence;
 
     public TLIntersectionLogicServiceImpl(int groupId, TLPersistenceService persistence){
         this.persistence = persistence;
         this.state = TLState.S0_MG_SR_PM;
         this.groupId = groupId;
-        this.mw_mode = TLMode.SCHEDULED;
-        this.me_mode = TLMode.SCHEDULED;
-        this.sn_mode = TLMode.SCHEDULED;
-        this.ss_mode = TLMode.SCHEDULED;
-        this.mw_health = TLHealth.HEALTHY;
-        this.me_health = TLHealth.HEALTHY;
-        this.sn_health = TLHealth.HEALTHY;
-        this.ss_health = TLHealth.HEALTHY;
-        this.mw_schedule = new TLSchedule();
-        this.me_schedule = new TLSchedule();
-        this.sn_schedule = new TLSchedule();
-        this.ss_schedule = new TLSchedule();
+        TLMode mw_mode = TLMode.SCHEDULED;
+        TLMode me_mode = TLMode.SCHEDULED;
+        TLMode sn_mode = TLMode.SCHEDULED;
+        TLMode ss_mode = TLMode.SCHEDULED;
+        TLHealth mw_health = TLHealth.HEALTHY;
+        TLHealth me_health = TLHealth.HEALTHY;
+        TLHealth sn_health = TLHealth.HEALTHY;
+        TLHealth ss_health = TLHealth.HEALTHY;
+        TLSchedule mw_schedule = new TLSchedule();
+        TLSchedule me_schedule = new TLSchedule();
+        TLSchedule sn_schedule = new TLSchedule();
+        TLSchedule ss_schedule = new TLSchedule();
 
+        TLPosition pos_mw = TLPosition.MAIN_ROAD_WEST;
+        TLType type_car = TLType.VEHICLE;
         main_west = new TrafficLight(state.getCurrentMainRoadColor(), pos_mw, mw_health, mw_mode, mw_schedule, type_car, groupId);
+        TLPosition pos_me = TLPosition.MAIN_ROAD_EAST;
         main_east = new TrafficLight(state.getCurrentMainRoadColor(), pos_me, me_health, me_mode, me_schedule, type_car, groupId);
+        TLPosition pos_sn = TLPosition.SIDE_ROAD_NORTH;
         side_north = new TrafficLight(state.getCurrentSideRoadColor(), pos_sn, sn_health, sn_mode, sn_schedule, type_car, groupId);
+        TLPosition pos_ss = TLPosition.SIDE_ROAD_SOUTH;
         side_south = new TrafficLight(state.getCurrentSideRoadColor(), pos_ss, ss_health, ss_mode, ss_schedule, type_car, groupId);
+        TLType type_ped = TLType.PEDESTRIAN;
         ped1_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health, me_mode, me_schedule, type_ped, groupId);
         ped1_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, ss_mode, ss_schedule, type_ped, groupId);
         ped2_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, ss_mode, ss_schedule, type_ped, groupId);
@@ -74,7 +65,7 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
         pedLights = new ArrayList<>(Arrays.asList(ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_east, ped4_north));
         roadLights= new ArrayList<>(Arrays.asList(main_west, main_east, side_north, side_south));
-        this.incident = Optional.empty();
+        optional = Optional.empty();
         printIntersection();
     }
 
@@ -100,8 +91,8 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
     private TLState calculateNextState() {
         //handle incident
-        if (incident.isPresent() && incident.get().getState().equals(TLIncident.STATE.UNRESOLVED)){
-            TLState emergency_state = state.nextState(incident.get().getPosition().isMain(), incident.get().getPosition().isSide());
+        if (optional.isPresent() && optional.get().getState().equals(TLIncident.STATE.UNRESOLVED)){
+            TLState emergency_state = state.nextState(optional.get().getPosition().isMain(), optional.get().getPosition().isSide());
             TLState scheduled_state = state.nextState(false, false);
             logger.debug("Emergency Transition to "+ emergency_state.toString() + " ; Scheduled was "+ scheduled_state.toString());
             return emergency_state;
@@ -114,16 +105,16 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
         //if past incident got green now it is resolved
         if (state.equals(TLState.S3_MR_SG_PS)){
             persistence.resolveSideRoadIncidents();
-            incident = persistence.updateIncident(incident, false, true);
+            optional = persistence.updateIncident(optional, false, true);
             logger.debug("Side Road incidents have been handled.");
         } else if(state.equals(TLState.S0_MG_SR_PM)){
             persistence.resolveMainRoadIncidents();
-            incident = persistence.updateIncident(incident, true, false);
+            optional = persistence.updateIncident(optional, true, false);
             logger.debug("Main Road incidents have been handled.");
         }
         //load new incident if necessary
-        if (incident.isEmpty()){
-            incident = persistence.getNextUnresolvedIncident();
+        if (optional.isEmpty()){
+            optional = persistence.getNextUnresolvedIncident();
         }
     }
 

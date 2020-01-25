@@ -9,32 +9,36 @@ import java.util.function.Predicate;
 
 public interface TLPersistenceService {
 
-    public List<TrafficLight> getFilteredTrafficLights(Predicate<TrafficLight> p);
+    static TLPersistenceService getInstance(){
+        return new TLPersistenceServiceImpl();
+    }
 
-    public List<TrafficLight> getAllTrafficLights();
+    List<TrafficLight> getFilteredTrafficLights(Predicate<TrafficLight> p);
 
-    public Optional<TrafficLight> getTrafficLight(int id);
+    List<TrafficLight> getAllTrafficLights();
 
-    public TrafficLight addTrafficLight(TrafficLight tl);
+    Optional<TrafficLight> getTrafficLight(int id);
 
-    public boolean removeTrafficLight(int id);
+    TrafficLight addTrafficLight(TrafficLight tl);
 
-    public boolean updateTrafficLight(int id, TrafficLight tl);
+    boolean removeTrafficLight(int id);
 
-    public boolean updateTrafficLightList(List<TrafficLight> tlList);
+    boolean updateTrafficLight(int id, TrafficLight tl);
 
-    public List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
+    boolean updateTrafficLightList(List<TrafficLight> tlList);
 
-    public List<TLIncident> getFilteredIncidents(Predicate<TLIncident> filter);
+    List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
 
-    public TLIncident addIncident(TLIncident incident);
+    List<TLIncident> getFilteredIncidents(Predicate<TLIncident> filter);
 
-    public Optional<TLIncident> getNextUnresolvedIncident();
+    TLIncident addIncident(TLIncident incident);
 
-    public Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen);
+    Optional<TLIncident> getNextUnresolvedIncident();
 
-    public boolean resolveSideRoadIncidents();
+    Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen);
 
-    public boolean resolveMainRoadIncidents();
+    boolean resolveSideRoadIncidents();
+
+    boolean resolveMainRoadIncidents();
 
 }
