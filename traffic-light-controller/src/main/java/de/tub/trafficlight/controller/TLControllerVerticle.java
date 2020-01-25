@@ -78,8 +78,7 @@ public class TLControllerVerticle extends AbstractVerticle {
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
         createHttpServer(router,host,port, options)
-                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port))
-                .setHandler(promise);
+                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, host, port));
     }
 
     private void apiPutSingle(RoutingContext routingContext) {

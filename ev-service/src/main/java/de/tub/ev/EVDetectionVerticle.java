@@ -77,8 +77,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
         createHttpServer(router,DEFAULT_HOST,DEFAULT_PORT, options)
-                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, DEFAULT_HOST, DEFAULT_PORT))
-                .setHandler(promise);
+                .compose(serverCreated -> publishHttpEndpoint(SERVICE_NAME, DEFAULT_HOST, DEFAULT_PORT));
     }
 
     private void apiRequestOnEVDetection(RoutingContext routingContext) {
