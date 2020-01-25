@@ -136,7 +136,7 @@ public class TLControllerVerticle extends AbstractVerticle {
     private void apiPostSingle(RoutingContext routingContext) {
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
-        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", "UNSPECIFIED"));
+        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", TLPosition.UNSPECIFIED.toString()));
         TLType type = getEnumFromString(TLType.class, json.getString("type", "VEHICLE"));
         TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
         if (color == null || type == null || position == null){

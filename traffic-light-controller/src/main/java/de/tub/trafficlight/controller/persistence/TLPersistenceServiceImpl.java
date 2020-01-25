@@ -60,13 +60,12 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     @Override
-    public boolean updateTrafficLightList(List<TrafficLight> tlList) {
+    public void updateTrafficLightList(List<TrafficLight> tlList) {
         for (TrafficLight tl : tlList) {
             if (!updateTrafficLight(tl.getId(), tl)) {
                 logger.error("Error: Failed to update TL");
             }
         }
-        return true;
     }
 
     @Override
@@ -92,10 +91,9 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     @Override
-    public TLIncident addIncident(TLIncident incident) {
+    public void addIncident(TLIncident incident) {
         logger.debug("New incident added to Persistence: " + incident.getPosition().toString());
         incidentRepo.put(COUNTER.getAndIncrement(), incident);
-        return incident;
     }
 
     @Override
@@ -134,15 +132,15 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     }
 
     @Override
-    public boolean resolveSideRoadIncidents() {
+    public void resolveSideRoadIncidents() {
         List<TLIncident> toResolve = getFilteredIncidents(filter -> filter.getState().equals(TLIncident.STATE.UNRESOLVED) && filter.getPosition().isSide());
-        return resolveList(toResolve);
+        resolveList(toResolve);
     }
 
     @Override
-    public boolean resolveMainRoadIncidents(){
+    public void resolveMainRoadIncidents(){
         List<TLIncident> toResolve = getFilteredIncidents(filter -> filter.getState().equals(TLIncident.STATE.UNRESOLVED) && filter.getPosition().isMain());
-        return resolveList(toResolve);
+        resolveList(toResolve);
     }
 
     private int resolveSingle(TLIncident incident){
@@ -159,15 +157,9 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
         return resolved;
     }
 
-    private boolean resolveList(List<TLIncident> toResolve) {
-        if (toResolve.size() >= 1){
-            int resolved = 0;
-            for (TLIncident incident : toResolve){
-                resolved += resolveSingle(incident);
-            }
-            return toResolve.size() == resolved;
-        } else {
-            return true;
+    private void resolveList(List<TLIncident> toResolve) {
+        for (TLIncident incident : toResolve){
+            resolveSingle(incident);
         }
     }
 

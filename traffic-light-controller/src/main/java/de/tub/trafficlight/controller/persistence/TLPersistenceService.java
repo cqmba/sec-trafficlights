@@ -25,20 +25,20 @@ public interface TLPersistenceService {
 
     boolean updateTrafficLight(int id, TrafficLight tl);
 
-    boolean updateTrafficLightList(List<TrafficLight> tlList);
+    void updateTrafficLightList(List<TrafficLight> tlList);
 
     List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
 
     List<TLIncident> getFilteredIncidents(Predicate<TLIncident> filter);
 
-    TLIncident addIncident(TLIncident incident);
+    void addIncident(TLIncident incident);
 
     Optional<TLIncident> getNextUnresolvedIncident();
 
     Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen);
 
-    boolean resolveSideRoadIncidents();
+    void resolveSideRoadIncidents();
 
-    boolean resolveMainRoadIncidents();
+    void resolveMainRoadIncidents();
 
 }

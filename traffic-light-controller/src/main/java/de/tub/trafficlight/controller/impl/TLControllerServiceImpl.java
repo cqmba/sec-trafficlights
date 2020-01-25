@@ -110,11 +110,6 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public boolean updateTL(int tlId, TrafficLight tl) {
-        return persistence.updateTrafficLight(tlId, tl);
-    }
-
-    @Override
     public TrafficLight changeColor(int tlId, TLColor color) {
         if(persistence.getTrafficLight(tlId).isPresent()){
             TrafficLight toUpdate = persistence.getTrafficLight(tlId).get();
