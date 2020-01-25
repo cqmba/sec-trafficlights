@@ -2,7 +2,6 @@ package de.tub.trafficlight.controller.logic;
 
 import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
-import de.tub.trafficlight.controller.schedule.TLSchedule;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -37,29 +36,25 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
         TLHealth me_health = TLHealth.HEALTHY;
         TLHealth sn_health = TLHealth.HEALTHY;
         TLHealth ss_health = TLHealth.HEALTHY;
-        TLSchedule mw_schedule = new TLSchedule();
-        TLSchedule me_schedule = new TLSchedule();
-        TLSchedule sn_schedule = new TLSchedule();
-        TLSchedule ss_schedule = new TLSchedule();
 
         TLPosition pos_mw = TLPosition.MAIN_ROAD_WEST;
         TLType type_car = TLType.VEHICLE;
-        main_west = new TrafficLight(state.getCurrentMainRoadColor(), pos_mw, mw_health, mw_schedule, type_car, groupId);
+        main_west = new TrafficLight(state.getCurrentMainRoadColor(), pos_mw, mw_health, type_car, groupId);
         TLPosition pos_me = TLPosition.MAIN_ROAD_EAST;
-        main_east = new TrafficLight(state.getCurrentMainRoadColor(), pos_me, me_health, me_schedule, type_car, groupId);
+        main_east = new TrafficLight(state.getCurrentMainRoadColor(), pos_me, me_health, type_car, groupId);
         TLPosition pos_sn = TLPosition.SIDE_ROAD_NORTH;
-        side_north = new TrafficLight(state.getCurrentSideRoadColor(), pos_sn, sn_health, sn_schedule, type_car, groupId);
+        side_north = new TrafficLight(state.getCurrentSideRoadColor(), pos_sn, sn_health, type_car, groupId);
         TLPosition pos_ss = TLPosition.SIDE_ROAD_SOUTH;
-        side_south = new TrafficLight(state.getCurrentSideRoadColor(), pos_ss, ss_health, ss_schedule, type_car, groupId);
+        side_south = new TrafficLight(state.getCurrentSideRoadColor(), pos_ss, ss_health, type_car, groupId);
         TLType type_ped = TLType.PEDESTRIAN;
-        ped1_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health, me_schedule, type_ped, groupId);
-        ped1_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, ss_schedule, type_ped, groupId);
-        ped2_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, ss_schedule, type_ped, groupId);
-        ped2_west = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_mw, mw_health, mw_schedule, type_ped, groupId);
-        ped3_north = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_sn, sn_health, sn_schedule, type_ped, groupId);
-        ped3_west = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_mw, mw_health, mw_schedule, type_ped, groupId);
-        ped4_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health,me_schedule, type_ped, groupId);
-        ped4_north = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_sn, sn_health, sn_schedule, type_ped, groupId);
+        ped1_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health, type_ped, groupId);
+        ped1_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, type_ped, groupId);
+        ped2_south = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_ss, ss_health, type_ped, groupId);
+        ped2_west = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_mw, mw_health, type_ped, groupId);
+        ped3_north = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_sn, sn_health, type_ped, groupId);
+        ped3_west = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_mw, mw_health, type_ped, groupId);
+        ped4_east = new TrafficLight(state.getCurrentMainPedestrianColor(), pos_me, me_health, type_ped, groupId);
+        ped4_north = new TrafficLight(state.getCurrentSidePedestrianColor(), pos_sn, sn_health, type_ped, groupId);
 
         pedLights = new ArrayList<>(Arrays.asList(ped1_east, ped1_south, ped2_west, ped2_south, ped3_north, ped3_west, ped4_east, ped4_north));
         roadLights= new ArrayList<>(Arrays.asList(main_west, main_east, side_north, side_south));
