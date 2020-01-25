@@ -198,7 +198,6 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiChangeColor(RoutingContext routingContext){
-        //TODO this is default EV Service target
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
         TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
