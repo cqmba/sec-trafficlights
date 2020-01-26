@@ -18,7 +18,7 @@ public class TLControllerServiceImpl implements TLControllerService {
     private Vertx vertx;
     private boolean interrupt;
 
-    private static int counter;
+    private int counter;
 
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
