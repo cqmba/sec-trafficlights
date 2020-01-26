@@ -1,4 +1,4 @@
-version: '3'
+version: '3.7'
 
 volumes:
   mysql_data:
@@ -31,17 +31,3 @@ services:
       depends_on:
         - mysql
         
-# version: '3.7'
-# services:
-
-#   hello:
-#     container_name: testapi
-#     build:
-#       context: ./hello-world/
-#       dockerfile: ./Dockerfile
-#     ports:
-#       - "8080:8080"
-#     deploy:
-#       replicas: 1
-#       restart_policy:
-#         condition: on-failure
