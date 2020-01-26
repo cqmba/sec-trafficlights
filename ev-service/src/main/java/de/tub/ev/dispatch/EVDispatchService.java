@@ -10,6 +10,6 @@ public interface EVDispatchService {
         return new EVDispatchServiceImpl(endpoint, vertx, config);
     }
 
-    void doDispatchEV(int id, RoutingContext routingContext);
+    void sendSensorDetection(int id, RoutingContext routingContext);
 
 }

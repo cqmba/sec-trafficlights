@@ -51,6 +51,10 @@ public class EVDetectionVerticle extends AbstractVerticle {
         // body handler
         router.route().handler(BodyHandler.create());
 
+
+
+
+
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
         final String keystorepass = config().getString("keystore.password", "password");
@@ -82,7 +86,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
             logger.debug("Sensor was requested for wrong id");
             routingContext.fail(400);
         }
-        service.doDispatchEV(id, routingContext);
+        service.sendSensorDetection(id, routingContext);
     }
 
     private void retrieveEndpoint(String service){

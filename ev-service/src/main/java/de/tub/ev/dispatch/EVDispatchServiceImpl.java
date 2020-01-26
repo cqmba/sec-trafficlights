@@ -5,6 +5,10 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
+import io.vertx.ext.auth.User;
+import io.vertx.ext.auth.oauth2.OAuth2Auth;
+import io.vertx.ext.auth.oauth2.OAuth2ClientOptions;
+import io.vertx.ext.auth.oauth2.OAuth2FlowType;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
@@ -45,21 +49,72 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     private void pullSensorPeriodically(){
         vertx.setPeriodic(SENSOR_INTERVAL, event -> {
             if (MOCKED_SENSOR_RESULT){
-                dispatchEV(MOCKED_SENSOR_ID);
+                authenticateAndDelegateToAPI(MOCKED_SENSOR_ID);
             }
         });
     }
 
 
     @Override
-    public void doDispatchEV(int id, RoutingContext routingContext) {
+    public void sendSensorDetection(int id, RoutingContext routingContext) {
         //manually triggered
+        authenticateAndDelegateToAPIonRequest(id, routingContext);
+    }
+
+    private void authenticateAndDelegateToAPI(int id){
+        OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
+                .setFlow(OAuth2FlowType.CLIENT).setClientID("vertx-test2")
+                .setTokenPath("http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token");
+
+        OAuth2Auth oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
+
+        JsonObject tokenConfig = new JsonObject();
+        oauth2.authenticate(tokenConfig, res -> {
+            if (res.failed()) {
+                logger.info("Error when trying to authenticate: " + res.cause().getMessage());
+            } else {
+                User user = res.result();
+                if (user.principal().containsKey("access_token")){
+                    logger.debug("User " + user + "authenticated, Token received: "+ user.principal().getString("access_token"));
+                    doDispatchToAPI(user, id);
+                } else {
+                    logger.info("User has no access token");
+                }
+            }
+        });
+    }
+
+    private void authenticateAndDelegateToAPIonRequest(int id, RoutingContext routingContext){
+        OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
+                .setFlow(OAuth2FlowType.CLIENT).setClientID("vertx-test2")
+                .setTokenPath("http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token");
+
+        OAuth2Auth oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
+
+        JsonObject tokenConfig = new JsonObject();
+        oauth2.authenticate(tokenConfig, res -> {
+            if (res.failed()) {
+                logger.info("Error when trying to authenticate: " + res.cause().getMessage());
+            } else {
+                User user = res.result();
+                if (user.principal().containsKey("access_token")){
+                    logger.debug("User " + user + "authenticated, Token received: "+ user.principal().getString("access_token"));
+                    doDispatchToAPIonRequest(user, id, routingContext);
+                } else {
+                    logger.info("User has no access token");
+                }
+            }
+        });
+    }
+
+    private void doDispatchToAPIonRequest(User user, int id, RoutingContext routingContext){
         final String path = BASE_TLC_API + id +"/colors";
         JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
 
         WebClient webClient = WebClient.create(vertx, webClientOptions);
         webClient
                 .putAbs(endpoint + path)
+                .bearerTokenAuthentication(user.principal().getString("access_token"))
                 .sendJsonObject(payload, ar -> {
                     if (ar.succeeded()) {
                         HttpResponse<Buffer> response = ar.result();
@@ -72,13 +127,14 @@ public class EVDispatchServiceImpl implements EVDispatchService {
                 });
     }
 
-    private void dispatchEV(int id){
+    private void doDispatchToAPI(User user, int id){
         //sensor triggered
         final String path = BASE_TLC_API + id +"/colors";
         JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
         WebClient webClient = WebClient.create(vertx, webClientOptions);
         webClient
                 .putAbs(endpoint + path)
+                .bearerTokenAuthentication(user.principal().getString("access_token"))
                 .sendJsonObject(payload, ar -> {
                     if (ar.succeeded()) {
                         HttpResponse<Buffer> response = ar.result();

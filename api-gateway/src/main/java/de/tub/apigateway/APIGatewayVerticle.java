@@ -14,6 +14,9 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
+import io.vertx.ext.auth.oauth2.OAuth2Auth;
+import io.vertx.ext.auth.oauth2.OAuth2FlowType;
+import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.healthchecks.HealthCheckHandler;
 import io.vertx.ext.healthchecks.HealthChecks;
 import io.vertx.ext.healthchecks.Status;
@@ -24,12 +27,16 @@ import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.ext.web.handler.SessionHandler;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 import io.vertx.servicediscovery.types.JDBCDataSource;
+import org.keycloak.TokenVerifier;
+import org.keycloak.common.VerificationException;
+import org.keycloak.representations.AccessToken;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,13 +51,15 @@ public class APIGatewayVerticle extends AbstractVerticle {
     private static final int DEFAULT_PORT_TLC = 8086;
     private static final int DEFAULT_PORT_EV = 8087;
     private static final int DEFAULT_PORT_DB = 3306;
-    private static final int DEFAULT_PORT_KC = 38080;
+    private static final int DEFAULT_PORT_KC = 8080;
 
     private final String tlcService = "traffic-light-service";
     private final String gwService = "api-gateway";
     private final String evService = "ev-service";
     private final String dbService = "database";
     private final String keycloakService = "keycloak";
+
+    private OAuth2Auth oauth2;
 
     protected ServiceDiscovery discovery;
     protected CircuitBreaker circuitBreaker;
@@ -86,8 +95,40 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>This is the gateway, please use the API</h1>");
         });
+
+
+        JsonObject keycloakJson = new JsonObject()
+                .put("realm", "vertx")
+                .put("auth-server-url", "http://localhost:8080/auth")
+                .put("ssl-required", "external")
+                .put("resource", "vertx-tlc2")
+                .put("verify-token-audience", true)
+                .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
+                .put("use-resource-role-mappings", true)
+                .put("confidential-port", 0)
+                .put("policy-enforcer", new JsonObject());
+
+        oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
+        OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
+
+        authHandler.setupCallback(router.get("/callback"));
+
+        router.route("/protected/*").handler(authHandler);
+        router.route("/protected/test").handler(routingContext -> {
+
+            if (hasRealmRole("ev", routingContext.user().principal().getString("access_token"))) {
+                HttpServerResponse response = routingContext.response();
+                response
+                        .putHeader("content-type", "text/html")
+                        .end("<h1>Hello protect</h1>");
+            } else {
+                routingContext.response().setStatusCode(401).end();
+            }
+        });
+
         router.get("/health").handler(healthHandler);
 
+        router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
         final String keystorepass = config().getString("keystore.password", "password");
@@ -297,10 +338,24 @@ public class APIGatewayVerticle extends AbstractVerticle {
         return "Time: " + System.currentTimeMillis();
     }
 
+    private boolean hasRealmRole(String role, String at) {
+
+        try {
+            AccessToken token = TokenVerifier.create(at, AccessToken.class).getToken();
+            if (token.getRealmAccess().getRoles().contains(role)){
+                return true;
+            }
+            logger.info("Client does not have needed role associated with his token, role: " + role);
+        } catch (VerificationException | NullPointerException e) {
+            logger.info("Client could not be verified");
+        }
+        return false;
+    }
+
+
     protected void enableLocalSession(Router router) {
-        //router.route().handler(CookieHandler.create());
         router.route().handler(SessionHandler.create(
-                LocalSessionStore.create(vertx, "shopping.user.session")));
+                LocalSessionStore.create(vertx, "vertx-tlc")));
     }
 
     protected void badRequest(RoutingContext context, Throwable ex) {
@@ -331,22 +386,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
                         .encodePrettily());
     }
 
-
-    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
-        Record record = HttpEndpoint.createRecord(name, host, port, "/",
-                new JsonObject().put("api.name", config().getString("api.name", ""))
-        );
-        return publish(record);
-    }
-
     protected Future<Void> publishApiGateway(String host, int port) {
         Record record = HttpEndpoint.createRecord("api-gateway", true, host, port, "/", null)
                 .setType("api-gateway");
-        return publish(record);
-    }
-
-    protected Future<Void> publishJDBCDataSource(String name, JsonObject location) {
-        Record record = JDBCDataSource.createRecord(name, location, new JsonObject());
         return publish(record);
     }
 
