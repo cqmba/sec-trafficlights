@@ -16,6 +16,7 @@ import { DetailviewComponent } from './detailview/detailview.component';
 import { OverviewComponent } from './overview/overview.component';
 import { FooterComponent } from './footer/footer.component';
 import { AppRoutingModule } from './app-routing/app-routing.module';
+import { HttpClientModule }    from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -36,7 +37,8 @@ import { AppRoutingModule } from './app-routing/app-routing.module';
     MatSlideToggleModule,
     MatInputModule,
     MatFormFieldModule,
-    MatSelectModule
+    MatSelectModule,
+    HttpClientModule
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -191,6 +191,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             List<TrafficLight> tlList = service.getTLList();
             routingContext.response()
                     .putHeader("content-type", "application/json; charset=utf-8")
+                    .putHeader("Access-Control-Allow-Origin", "http://localhost:4200")
                     .end(Json.encodePrettily(tlList));
         } catch (Exception ex){
             internalError(routingContext, new Exception("Unable to Retrieve the traffic lights"));

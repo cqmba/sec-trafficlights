@@ -1,21 +1,25 @@
 import { Injectable } from '@angular/core';
 import { TrafficLight } from './model/traffic_light';
 import { Transition, States } from './model/transition';
-import { Observable, of } from 'rxjs';
-import {Subject} from "rxjs";
+import { Observable, of, timer, Subject } from 'rxjs';
+import {take} from 'rxjs/operators';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 @Injectable({
   providedIn: 'root'
 })
 export class OverviewDataService {
 
-  private tlList: TrafficLight[];
-  private tlListFlat : TrafficLight[];
+  private tlList: Subject<TrafficLight[]> = new Subject<TrafficLight[]>();
+  private http : HttpClient;
+
+  BASE_URL : string = "https://localhost:8086"
 
   constructSampleData(): void{
 
     //Init pedestrian Transitions for pedestrian light
     var pedestrianTransitions : Transition[] = [];
+    const reloadInterval = 60;
 
     var pedStateRED  = new Transition( States.RED, 20, States.GREEN, true);
     var pedStateGREEN  = new Transition(States.GREEN, 10, States.RED, false);
@@ -43,36 +47,46 @@ export class OverviewDataService {
     var carStateList = [ States.RED, States.RED_YELLOW, States.GREEN, States.YELLOW, States.YELLOW_BLINK];
     var tlList: TrafficLight[] = [];
     //Init trafic lights
-    tlList.push(new TrafficLight("Pedestrian_SE_FN", "default", 15, pedestrianTransitions, States.RED, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_SE_FW", "default", 15, pedestrianTransitions, States.RED_YELLOW, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_SW_FN", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_SW_FE", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_NE_FS", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_NE_FW", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_NW_FE", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Pedestrian_NW_FS", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
-    tlList.push(new TrafficLight("Car_S", "default", 15, carTransitions, States.YELLOW, 'GOOD', 'SCHEDULED', carStateList));
-    tlList.push(new TrafficLight("Car_E", "default", 15, carTransitions, States.YELLOW_BLINK, 'BROKEN HW', 'MAINTENANCE', carStateList));
-    tlList.push(new TrafficLight("Car_N", "default", 15, carTransitions, States.YELLOW, 'GOOD', 'SCHEDULED', carStateList));
-    tlList.push(new TrafficLight("Car_W", "default", 15, carTransitions, States.RED, 'GOOD', 'SCHEDULED', carStateList));
+    // tlList.push(new TrafficLight("Pedestrian_SE_FN", "default", 15, pedestrianTransitions, States.RED, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_SE_FW", "default", 15, pedestrianTransitions, States.RED_YELLOW, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_SW_FN", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_SW_FE", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_NE_FS", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_NE_FW", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_NW_FE", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Pedestrian_NW_FS", "default", 15, pedestrianTransitions, States.GREEN, 'GOOD', 'SCHEDULED', pedStateList));
+    // tlList.push(new TrafficLight("Car_S", "default", 15, carTransitions, States.YELLOW, 'GOOD', 'SCHEDULED', carStateList));
+    // tlList.push(new TrafficLight("Car_E", "default", 15, carTransitions, States.YELLOW_BLINK, 'BROKEN HW', 'MAINTENANCE', carStateList));
+    // tlList.push(new TrafficLight("Car_N", "default", 15, carTransitions, States.YELLOW, 'GOOD', 'SCHEDULED', carStateList));
+    // tlList.push(new TrafficLight("Car_W", "default", 15, carTransitions, States.RED, 'GOOD', 'SCHEDULED', carStateList));
 
-    this.tlList = tlList;
+
   }
 
 
-  constructor() {
-    this.constructSampleData();
+  constructor(private httpClient: HttpClient) {
+    this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
+      this.tlList.next(list);
+    });
+    this.update();
+    window.setInterval(fun => {
+      this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
+        this.tlList.next(list);
+      });
+    }, 2000);
   }
 
-  getTLList() : Observable<TrafficLight[]> {
-    return of (this.tlList);
+  public update() : void {
+    this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
+      this.tlList.next(list);
+    });
   }
 
-  getTL(id : string) : TrafficLight{
-    for (var tl of this.tlList){
-      if (tl.id === id){
-        return tl;
-      }
-    }
+  getTLList() : Subject<TrafficLight[]> {
+    return this.tlList;
+  }
+
+  getTL(id : number) : Observable<TrafficLight>{
+    return this.http.get<TrafficLight>(this.BASE_URL+"/lights/"+id);
   }
 }

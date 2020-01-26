@@ -4,31 +4,31 @@
 <div>
   <table mat-table [dataSource]="tlList" class="mat-elevation-z8">
 
-  <ng-container matColumnDef="id">
+  <ng-container matColumnDef="position">
     <th mat-header-cell *matHeaderCellDef> Name </th>
-    <td mat-cell *matCellDef="let tl"> {{tl.id}} </td>
+    <td mat-cell *matCellDef="let tl"> {{tl.position}} </td>
   </ng-container>
 
-  <ng-container matColumnDef="currentState">
+  <ng-container matColumnDef="color">
     <th mat-header-cell *matHeaderCellDef> Current State </th>
     <td mat-cell *matCellDef="let tl">
       <mat-chip-list>
-        <mat-chip>{{tl.state}}</mat-chip>
+        <mat-chip [ngStyle]="{backgroundColor: getColorColor(tl.color)}">{{tl.color}}</mat-chip>
       </mat-chip-list>
     </td>
   </ng-container>
 
-  <ng-container matColumnDef="mode">
-    <th mat-header-cell *matHeaderCellDef> Current Mode </th>
+  <ng-container matColumnDef="health">
+    <th mat-header-cell *matHeaderCellDef> Current Heath </th>
     <td mat-cell *matCellDef="let tl">
       <mat-chip-list>
-        <mat-chip [ngStyle]="{backgroundColor: getColorMode(tl.mode)}" >{{tl.mode}}</mat-chip>
+        <mat-chip [ngStyle]="{backgroundColor: getColorHealth(tl.health)}" >{{tl.health}}</mat-chip>
       </mat-chip-list>
     </td>
   </ng-container>
-  <ng-container matColumnDef="lastSeen">
-    <th mat-header-cell *matHeaderCellDef> Last Seen </th>
-    <td mat-cell *matCellDef="let tl"> {{tl.last_seen}} s </td>
+  <ng-container matColumnDef="type">
+    <th mat-header-cell *matHeaderCellDef> Type </th>
+    <td mat-cell *matCellDef="let tl"> {{tl.type}} </td>
   </ng-container>
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
