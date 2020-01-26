@@ -1,15 +1,15 @@
 package de.tub.ev.dispatch;
 
 import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpClient;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 
 public interface EVDispatchService {
 
-    static EVDispatchService getInstance(HttpClient client, Vertx vertx){
-        return new EVDispatchServiceImpl(client, vertx);
+    static EVDispatchService getInstance(String endpoint, Vertx vertx, JsonObject config){
+        return new EVDispatchServiceImpl(endpoint, vertx, config);
     }
 
-    void doDispatchEV(int id);
+    void doDispatchEV(int id, RoutingContext routingContext);
 
 }
