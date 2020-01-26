@@ -1,0 +1,7 @@
+{
+  "api.name": "ev-service",
+  "keystore.password" : "2E63KpCw89yXuVqS",
+  "keystore.path" : "ev_keystore.jks",
+  "truststore.path" : "ev_truststore.jks",
+  "truststore.pass" : "2E63KpCw89yXuVqS"
+}

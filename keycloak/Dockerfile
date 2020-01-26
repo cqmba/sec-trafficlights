@@ -1,0 +1,9 @@
+# Extend base image
+FROM jboss/keycloak
+
+ENV KEYCLOAK_IMPORT_FILE ./conf/realm-export.json
+ENV KEYCLOAK_TARGET_HOME conf
+
+EXPOSE 8080
+
+COPY $KEYCLOAK_IMPORT_FILE  $KEYCLOAK_TARGET_HOME/
