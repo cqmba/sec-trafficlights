@@ -120,7 +120,7 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
             logger.debug("Main Road incidents have been handled.");
         }
         //load new incident if necessary
-        if (optional.isEmpty()){
+        if (!optional.isPresent()){
             optional = persistence.getNextUnresolvedIncident();
         }
     }

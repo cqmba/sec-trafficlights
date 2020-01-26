@@ -5,7 +5,6 @@ import de.tub.trafficlight.controller.entity.TLPosition;
 import de.tub.trafficlight.controller.entity.TLType;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
@@ -23,7 +22,6 @@ import io.vertx.servicediscovery.types.HttpEndpoint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -41,8 +39,8 @@ public class TLControllerVerticle extends AbstractVerticle {
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
     @Override
-    public void start(Promise<Void> promise) throws Exception {
-        super.start(promise);
+    public void start() throws Exception {
+        super.start();
         //TODO retrieve config
         discovery = ServiceDiscovery.create(vertx);
 
@@ -91,7 +89,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             logger.debug("Id was no int");
             return;
         }
-        if (service.getSingleTLState(id).isEmpty()){
+        if (!service.getSingleTLState(id).isPresent()){
             routingContext.fail(404);
             return;
         }
@@ -176,7 +174,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
-        if (service.getSingleTLState(id).isEmpty()){
+        if (!service.getSingleTLState(id).isPresent()){
             logger.debug("Traffic Light for given ID could not be found");
             notFound(routingContext);
             return;
@@ -215,7 +213,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("ID could not be parsed to int"));
             return;
         }
-        if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
+        if (!service.getSingleTLState(id).isPresent() || service.getSingleTLState(id).get().getGroup() != group){
             logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
             badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
             return;
@@ -322,31 +320,5 @@ public class TLControllerVerticle extends AbstractVerticle {
             }
         });
         return promise.future();
-    }
-
-    @Override
-    public void stop(Promise<Void> promise) {
-        List<Promise> promises = new ArrayList<>();
-        registeredRecords.forEach(record -> {
-            Promise<Void> cleanupPromise = Promise.promise();
-            promises.add(cleanupPromise);
-            discovery.unpublish(record.getRegistration(), cleanupPromise);
-        });
-        List<Future> allFutures = new ArrayList<>();
-        promises.forEach(p -> allFutures.add(p.future()));
-        if (promises.isEmpty()) {
-            discovery.close();
-            promise.complete();
-        } else {
-            CompositeFuture.all(allFutures)
-                    .setHandler(ar -> {
-                        discovery.close();
-                        if (ar.failed()) {
-                            promise.fail(ar.cause());
-                        } else {
-                            promise.complete();
-                        }
-                    });
-        }
     }
 }

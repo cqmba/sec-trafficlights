@@ -108,7 +108,7 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
 
     @Override
     public Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen) {
-        if (incident.isEmpty()){
+        if (!incident.isPresent()){
             //nothing to do
             return incident;
         } else if (incident.get().getState().equals(TLIncident.STATE.RESOLVED)){
