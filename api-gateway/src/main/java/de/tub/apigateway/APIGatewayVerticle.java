@@ -1,6 +1,7 @@
 package de.tub.apigateway;
 
 import de.tub.apigateway.RestAPIVerticle;
+import io.netty.handler.codec.http.HttpStatusClass;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpClient;
@@ -26,9 +27,10 @@ import io.vertx.servicediscovery.types.HttpEndpoint;
 import java.util.List;
 import java.util.Optional;
 
-//import org.keycloak.RSATokenVerifier;
-//import org.keycloak.common.VerificationException;
-//import org.keycloak.representations.AccessToken;
+import org.keycloak.RSATokenVerifier;
+import org.keycloak.TokenVerifier;
+import org.keycloak.common.VerificationException;
+import org.keycloak.representations.AccessToken;
 
 public class APIGatewayVerticle extends RestAPIVerticle {
 
@@ -86,21 +88,20 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         //router.route("/callback").handler(context -> authCallback(oauth2, hostURI, context));
 
         router.route("/protected/*").handler(authHandler);
-        
         router.route("/protected/test").handler(routingContext -> {
-            HttpServerResponse response = routingContext.response();
-            response
-                    .putHeader("content-type", "text/html")
-                    .end("<h1>Hello protect</h1>");
-            
-//            try {
-//				AccessToken token = RSATokenVerifier.create(routingContext.user().principal().getString("access_token")).getToken();
-//				System.out.println(token.getRealmAccess());
-//			} catch (VerificationException e) {
-//				System.err.println("error optaining token:");
-//				e.printStackTrace();
-//        }
+        	
+        	if (hasRealmRole("ev", routingContext.user().principal().getString("access_token"))) {
+        		HttpServerResponse response = routingContext.response();
+                response
+                        .putHeader("content-type", "text/html")
+                        .end("<h1>Hello protect</h1>");
+            } else {
+            	routingContext.response().setStatusCode(401).end();
+            }
         });
+            
+        	
+    
         
         
         //router.get("/uaa").handler(this::authUaaHandler);
@@ -119,7 +120,7 @@ public class APIGatewayVerticle extends RestAPIVerticle {
         // api dispatcher
         router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
-
+        
         final String keystorepass = config().getString("keystore.password", "4mB8nqJd5YEHFkw6");
         final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
         final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
@@ -141,6 +142,23 @@ public class APIGatewayVerticle extends RestAPIVerticle {
                         promise.fail(ar.cause());
                     }
                 });
+    }
+    
+    private boolean hasRealmRole(String role, String at) {
+    	
+    	try {
+			AccessToken token = TokenVerifier.create(at, AccessToken.class).getToken();
+		if (token.getRealmAccess().getRoles().contains(role)){
+			return true;
+			
+		}
+		} catch (VerificationException e) {
+			e.printStackTrace();
+		//Realm Access object might be null
+		} catch (NullPointerException e) {
+			e.printStackTrace();
+		}
+    	return false;
     }
 
     private void dispatchRequests(RoutingContext context) {
