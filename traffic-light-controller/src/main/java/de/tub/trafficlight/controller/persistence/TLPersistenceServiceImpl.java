@@ -1,6 +1,8 @@
 package de.tub.trafficlight.controller.persistence;
 
+import de.tub.trafficlight.controller.entity.TLColor;
 import de.tub.trafficlight.controller.entity.TLIncident;
+import de.tub.trafficlight.controller.entity.TLMode;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,10 +20,12 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
 
     private Map<Integer, TrafficLight> tlRepo;
     private Map<Integer, TLIncident> incidentRepo;
+    private TLMode freeTLMode;
 
     public TLPersistenceServiceImpl(){
         tlRepo = new HashMap<>();
         incidentRepo = new HashMap<>();
+        freeTLMode = TLMode.SCHEDULED;
     }
 
     @Override
@@ -71,18 +75,10 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     @Override
     public List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList) {
         List<TrafficLight> addedList = new ArrayList<>();
-        try {
             for (TrafficLight tl : tlList) {
-                if (!tl.equals(addTrafficLight(tl))) {
-                    throw new Exception("Error: Failed to add TL");
-                }else {
-                    addedList.add(tl);
-                }
+                addedList.add(addIntersectionTrafficLight(tl));
             }
             return addedList;
-        } catch (Exception e) {
-            return addedList;
-        }
     }
 
     @Override
@@ -141,6 +137,36 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     public void resolveMainRoadIncidents(){
         List<TLIncident> toResolve = getFilteredIncidents(filter -> filter.getState().equals(TLIncident.STATE.UNRESOLVED) && filter.getPosition().isMain());
         resolveList(toResolve);
+    }
+
+    @Override
+    public TLMode switchModeOfFreeTLs(TLMode newMode) {
+        this.freeTLMode = newMode;
+        List<TrafficLight> oldList = getFilteredTrafficLights(tl -> tl.getGroup() == 2);
+        List<TrafficLight> toUpdate = new ArrayList<>();
+        if (newMode.equals(TLMode.MAINTENANCE)){
+            for (TrafficLight tl : oldList){
+                tl.setColor(TLColor.YELLOWBLINKING);
+                toUpdate.add(tl);
+            }
+        } else if(newMode.equals(TLMode.SCHEDULED)){
+            for (TrafficLight tl : oldList){
+                tl.setColor(TLColor.GREEN);
+                toUpdate.add(tl);
+            }
+        }
+        updateTrafficLightList(toUpdate);
+        return freeTLMode;
+    }
+
+    @Override
+    public TLMode getFreeTLMode() {
+        return freeTLMode;
+    }
+
+    private TrafficLight addIntersectionTrafficLight(TrafficLight tl){
+        tlRepo.put(tl.getId(), tl);
+        return tl;
     }
 
     private int resolveSingle(TLIncident incident){

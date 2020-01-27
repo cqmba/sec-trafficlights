@@ -2,9 +2,6 @@ package de.tub.apigateway;
 
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
-import io.vertx.config.ConfigRetriever;
-import io.vertx.config.ConfigRetrieverOptions;
-import io.vertx.config.ConfigStoreOptions;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerOptions;
@@ -33,15 +30,11 @@ import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
-import io.vertx.servicediscovery.types.JDBCDataSource;
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -221,12 +214,13 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 // a relevant http client endpoint
                 Optional<Record> client = recordList.stream()
                         .filter(record -> record.getMetadata().getString("api.name") != null)
-                        .filter(record -> record.getMetadata().getString("api.name").equals(prefix))
+                        .filter(record -> record.getMetadata().getString("api.name").equals(prefix) ||
+                                record.getMetadata().getString("api.alt").equals(prefix))
                         .findAny();
 
                 if (client.isPresent() && client.get().getLocation().containsKey("endpoint")) {
                     String endpoint = client.get().getLocation().getString("endpoint");
-                    doDispatch(context, "/"+prefix+newPath, endpoint, promise);
+                    doDispatch(context, prefix+newPath, endpoint, promise);
                 } else {
                     notFound(context);
                     promise.complete();
@@ -260,8 +254,15 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setVerifyHost(true);
 
+        Set<String> userRoles = retrieveRoles(context);
+
         WebClient webClient = WebClient.create(vertx, options);
         HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
+        //TODO make this secure
+        for (String role : userRoles){
+            request.addQueryParam("role", role);
+        }
+        request.addQueryParam("username", context.user().principal().getString("username"));
         if (context.request().headers().size() >= 1){
             request.putHeaders(context.request().headers());
         }
@@ -275,13 +276,40 @@ public class APIGatewayVerticle extends AbstractVerticle {
         }
     }
 
+    private Set<String> retrieveRoles(RoutingContext routingContext){
+        logger.debug(routingContext.user().principal());
+        JsonObject userJson = routingContext.user().principal();
+        if (userJson.containsKey("username")){
+            logger.info("User " + routingContext.user() + "authenticated");
+        }
+        if (userJson.containsKey("access_token")){
+            return getRolesFromToken(userJson);
+        } else {
+            logger.debug("Unauthorized Request");
+            return new HashSet<>();
+        }
+    }
+
+    private Set<String> getRolesFromToken(JsonObject principal) {
+        try {
+            String tokenStr = principal.getString("access_token");
+            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
+            Set<String> roles = token.getRealmAccess().getRoles();
+            return roles;
+        } catch (VerificationException | NullPointerException e) {
+            logger.info("Client could not be verified");
+            return new HashSet<>();
+        }
+    }
+
     private void handleAsyncResult(RoutingContext context, Promise<Object> promise, AsyncResult<HttpResponse<Buffer>> ar) {
         if (ar.succeeded()) {
             HttpResponse<Buffer> result = ar.result();
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
+            //TODO fix
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
-            toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
+            //toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
             promise.complete();
             logger.info("Request successfully handled");
@@ -309,7 +337,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
         final String DEFAULT_HOSTNAME = "localhost";
         final String DEFAULT_WEBROOT = "";
 
-        Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights"));
+        Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights").put("api.alt", "groups"));
         //Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
         Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
         Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
