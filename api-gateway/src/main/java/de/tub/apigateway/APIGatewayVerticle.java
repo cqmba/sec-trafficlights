@@ -83,7 +83,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
         Router router = Router.router(vertx);
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
-        registerHealthEndpoints(healthHandler);
+
 
         enableLocalSession(router);
         router.route().handler(BodyHandler.create());
@@ -126,8 +126,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
             }
         });
 
-        router.get("/health").handler(healthHandler);
-
         router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
@@ -143,6 +141,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
+
+        registerHealthEndpoints(healthHandler);
+        router.get("/health").handler(healthHandler);
 
         vertx.createHttpServer(options)
                 .requestHandler(router)
@@ -189,20 +190,24 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
-        for (String service : Stream.of(tlcService, gwService, evService, dbService, keycloakService).collect(Collectors.toList())){
+        for (String service : Stream.of(tlcService, evService, dbService, keycloakService).collect(Collectors.toList())){
             //TODO this only checks if discovery has this service, not if this is reachable -> makes only sense with kubernetes
-            healthHandler.register(service,
-                    future -> HttpEndpoint.getClient(discovery,
-                            (rec) -> service.equals(rec.getName()),
-                            client -> {
-                                if (client.failed()) {
-                                    future.fail(client.cause());
-                                } else {
-                                    client.result().close();
-                                    future.complete(Status.OK());
-                                }
-                            }));
+            registerSingleHealthEndpoint(healthHandler, service);
         }
+    }
+
+    private void registerSingleHealthEndpoint(HealthCheckHandler healthHandler, String service){
+        healthHandler.register(service,
+                future -> HttpEndpoint.getClient(discovery,
+                        (rec) -> service.equals(rec.getName()),
+                        client -> {
+                            if (client.failed()) {
+                                future.fail(client.cause());
+                            } else {
+                                client.result().close();
+                                future.complete(Status.OK());
+                            }
+                        }));
     }
 
     private void dispatchRequests(RoutingContext context) {
@@ -317,20 +322,13 @@ public class APIGatewayVerticle extends AbstractVerticle {
         final String DEFAULT_WEBROOT = "";
 
         Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights"));
-        Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
+        //Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
         Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
         Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
         Record record5 = HttpEndpoint.createRecord(keycloakService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_KC, DEFAULT_WEBROOT, new JsonObject());
         //publish all records
-        for (Record record: Stream.of(record1, record2, record3, record4, record5).collect(Collectors.toList())){
-            discovery.publish(record, ar -> {
-                if (ar.succeeded()){
-                    Record publishedRecord = ar.result();
-                    logger.debug("Service "+ publishedRecord.getName() + " published on endpoint " + publishedRecord.getLocation().getString("endpoint"));
-                } else {
-                    logger.error(printTime() + " Service" + record.getName() + " could not be published");
-                }
-            });
+        for (Record record: Stream.of(record1, record3, record4, record5).collect(Collectors.toList())){
+            publish(record);
         }
     }
 
