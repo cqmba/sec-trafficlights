@@ -85,7 +85,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
 
 
-        enableLocalSession(router);
+        //enableLocalSession(router);
         router.route().handler(BodyHandler.create());
         router.get("/api/v").handler(this::apiVersion);
 
@@ -112,19 +112,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
 
         authHandler.setupCallback(router.get("/callback"));
-
-        router.route("/protected/*").handler(authHandler);
-        router.route("/protected/test").handler(routingContext -> {
-
-            if (hasRealmRole("ev", routingContext.user().principal().getString("access_token"))) {
-                HttpServerResponse response = routingContext.response();
-                response
-                        .putHeader("content-type", "text/html")
-                        .end("<h1>Hello protect</h1>");
-            } else {
-                routingContext.response().setStatusCode(401).end();
-            }
-        });
 
         router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
@@ -294,6 +281,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
+            toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
             promise.complete();
             logger.info("Request successfully handled");
