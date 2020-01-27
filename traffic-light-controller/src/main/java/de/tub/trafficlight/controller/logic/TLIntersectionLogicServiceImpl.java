@@ -68,9 +68,9 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     }
 
     @Override
-    public boolean setMode(TLMode mode) {
-        this.mode = mode;
-        return true;
+    public TLMode setMode(TLMode newmode) {
+        this.mode = newmode;
+        return mode;
     }
 
     @Override
