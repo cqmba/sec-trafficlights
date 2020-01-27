@@ -51,10 +51,6 @@ public class EVDetectionVerticle extends AbstractVerticle {
         // body handler
         router.route().handler(BodyHandler.create());
 
-
-
-
-
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
         final String keystorepass = config().getString("keystore.password", "password");

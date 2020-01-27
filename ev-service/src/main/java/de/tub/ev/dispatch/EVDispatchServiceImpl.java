@@ -19,12 +19,15 @@ import org.apache.logging.log4j.Logger;
 public class EVDispatchServiceImpl implements EVDispatchService {
 
     private static final String BASE_TLC_API = "api/lights/";
+    private static final String TOKEN_PATH = "http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token";
+    private static final String AUTH_CLIENTID = "vertx-test2";
 
     private static final Logger logger = LogManager.getLogger(EVDispatchServiceImpl.class);
 
     private String endpoint;
     private Vertx vertx;
     private WebClientOptions webClientOptions;
+    private OAuth2Auth oauth2;
     private static final boolean MOCKED_SENSOR_RESULT = false;
     private static final int MOCKED_SENSOR_ID = 1;
     private static final int SENSOR_INTERVAL = 1000;
@@ -43,6 +46,12 @@ public class EVDispatchServiceImpl implements EVDispatchService {
                 .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setVerifyHost(true);
+
+        OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
+                .setFlow(OAuth2FlowType.CLIENT).setClientID(AUTH_CLIENTID)
+                .setTokenPath(TOKEN_PATH);
+
+        this.oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
         pullSensorPeriodically();
     }
 
@@ -62,12 +71,6 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     }
 
     private void authenticateAndDelegateToAPI(int id){
-        OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
-                .setFlow(OAuth2FlowType.CLIENT).setClientID("vertx-test2")
-                .setTokenPath("http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token");
-
-        OAuth2Auth oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
-
         JsonObject tokenConfig = new JsonObject();
         oauth2.authenticate(tokenConfig, res -> {
             if (res.failed()) {
@@ -85,12 +88,6 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     }
 
     private void authenticateAndDelegateToAPIonRequest(int id, RoutingContext routingContext){
-        OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
-                .setFlow(OAuth2FlowType.CLIENT).setClientID("vertx-test2")
-                .setTokenPath("http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token");
-
-        OAuth2Auth oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
-
         JsonObject tokenConfig = new JsonObject();
         oauth2.authenticate(tokenConfig, res -> {
             if (res.failed()) {
