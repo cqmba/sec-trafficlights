@@ -58,6 +58,7 @@ public class TLControllerVerticle extends AbstractVerticle {
         router.put(API_SINGLE_STATE).handler(this::apiPutSingle);
         router.delete(API_SINGLE_STATE).handler(this::apiDeleteSingle);
         router.put(API_SINGLE_COLOR).handler(this::apiChangeColor);
+        router.options(API_STATES).handler(this::apiGetAll);
 
         //config
         String host = "localhost";
@@ -191,7 +192,7 @@ public class TLControllerVerticle extends AbstractVerticle {
             List<TrafficLight> tlList = service.getTLList();
             routingContext.response()
                     .putHeader("content-type", "application/json; charset=utf-8")
-                    .putHeader("Access-Control-Allow-Origin", "http://localhost:4200")
+                    .putHeader("Access-Control-Allow-Origin", "*")
                     .end(Json.encodePrettily(tlList));
         } catch (Exception ex){
             internalError(routingContext, new Exception("Unable to Retrieve the traffic lights"));
