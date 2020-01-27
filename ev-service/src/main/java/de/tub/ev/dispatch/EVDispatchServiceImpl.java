@@ -2,6 +2,7 @@ package de.tub.ev.dispatch;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.cli.CLI;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
@@ -21,6 +22,7 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     private static final String BASE_TLC_API = "api/lights/";
     private static final String TOKEN_PATH = "http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token";
     private static final String AUTH_CLIENTID = "vertx-test2";
+    private static final String CLIENT_SECRET = "ab4bf0ae-6b51-47e6-ba89-4455c5a0a825";
 
     private static final Logger logger = LogManager.getLogger(EVDispatchServiceImpl.class);
 
@@ -49,7 +51,7 @@ public class EVDispatchServiceImpl implements EVDispatchService {
 
         OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
                 .setFlow(OAuth2FlowType.CLIENT).setClientID(AUTH_CLIENTID)
-                .setTokenPath(TOKEN_PATH);
+                .setTokenPath(TOKEN_PATH).setClientSecret(CLIENT_SECRET);
 
         this.oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
         pullSensorPeriodically();
