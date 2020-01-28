@@ -80,6 +80,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetGroup(RoutingContext routingContext){
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -104,6 +110,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPutGroupMode(RoutingContext routingContext){
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "admin"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -134,6 +146,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -164,6 +182,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPostSingle(RoutingContext routingContext) {
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -202,6 +226,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetSingle(RoutingContext routingContext) {
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -227,6 +257,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetAll(RoutingContext routingContext) {
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -242,19 +278,13 @@ public class TLControllerVerticle extends AbstractVerticle {
         }
     }
 
-    private boolean isAuthorized(RoutingContext routingContext, Set<String> acceptedRoles) {
-        MultiMap params = routingContext.request().params();
-        String token = params.get("token");
-        Set<String> roles = getRolesFromToken(token);
-        for (String role : acceptedRoles){
-            if(acceptedRoles.contains(role)){
-                return true;
-            }
-        }
-        return false;
-    }
-
     private void apiChangeColor(RoutingContext routingContext){
+        String username = getUsername(routingContext);
+        if (username.isEmpty()){
+            routingContext.fail(401);
+        } else {
+            logger.info("User: "+username+ "requested Resource");
+        }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "ev"));
         if(!isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
@@ -282,7 +312,6 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
             return;
         }
-        String username = "placeholder";
         Set<String> roles = getRolesFromToken(routingContext.request().params().get("token"));
         if (roles.contains("manager")){
             logger.debug("TLC-Manager Requested Color Assignment from user " + username);
@@ -300,6 +329,30 @@ public class TLControllerVerticle extends AbstractVerticle {
             }
         } else {
             routingContext.fail(403);
+        }
+    }
+
+    private boolean isAuthorized(RoutingContext routingContext, Set<String> acceptedRoles) {
+        MultiMap params = routingContext.request().params();
+        String token = params.get("token");
+        Set<String> actualRoles = getRolesFromToken(token);
+        for (String role : acceptedRoles){
+            if(actualRoles.contains(role)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String getUsername(RoutingContext routingContext){
+        MultiMap params = routingContext.request().params();
+        String tokenStr = params.get("token");
+        try {
+            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
+            return token.getPreferredUsername();
+        } catch (VerificationException | NullPointerException e) {
+            logger.info("Client has no username associated");
+            return "";
         }
     }
 
