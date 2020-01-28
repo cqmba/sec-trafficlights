@@ -15,7 +15,7 @@ public interface TLIntersectionLogicService {
 
     TLMode getMode();
 
-    boolean setMode(TLMode mode);
+    TLMode setMode(TLMode mode);
 
     void doTransition();
 

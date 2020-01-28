@@ -2,9 +2,6 @@ package de.tub.apigateway;
 
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
-import io.vertx.config.ConfigRetriever;
-import io.vertx.config.ConfigRetrieverOptions;
-import io.vertx.config.ConfigStoreOptions;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerOptions;
@@ -14,6 +11,9 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
+import io.vertx.ext.auth.oauth2.OAuth2Auth;
+import io.vertx.ext.auth.oauth2.OAuth2FlowType;
+import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.healthchecks.HealthCheckHandler;
 import io.vertx.ext.healthchecks.HealthChecks;
 import io.vertx.ext.healthchecks.Status;
@@ -24,17 +24,17 @@ import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.ext.web.handler.SessionHandler;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
-import io.vertx.servicediscovery.types.JDBCDataSource;
+import org.keycloak.TokenVerifier;
+import org.keycloak.common.VerificationException;
+import org.keycloak.representations.AccessToken;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,13 +44,15 @@ public class APIGatewayVerticle extends AbstractVerticle {
     private static final int DEFAULT_PORT_TLC = 8086;
     private static final int DEFAULT_PORT_EV = 8087;
     private static final int DEFAULT_PORT_DB = 3306;
-    private static final int DEFAULT_PORT_KC = 38080;
+    private static final int DEFAULT_PORT_KC = 8080;
 
     private final String tlcService = "traffic-light-service";
     private final String gwService = "api-gateway";
     private final String evService = "ev-service";
     private final String dbService = "database";
     private final String keycloakService = "keycloak";
+
+    private OAuth2Auth oauth2;
 
     protected ServiceDiscovery discovery;
     protected CircuitBreaker circuitBreaker;
@@ -74,9 +76,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
         Router router = Router.router(vertx);
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
-        registerHealthEndpoints(healthHandler);
 
-        enableLocalSession(router);
+
+        //enableLocalSession(router);
         router.route().handler(BodyHandler.create());
         router.get("/api/v").handler(this::apiVersion);
 
@@ -86,8 +88,25 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>This is the gateway, please use the API</h1>");
         });
-        router.get("/health").handler(healthHandler);
 
+
+        JsonObject keycloakJson = new JsonObject()
+                .put("realm", "vertx")
+                .put("auth-server-url", "http://localhost:8080/auth")
+                .put("ssl-required", "external")
+                .put("resource", "vertx-tlc2")
+                .put("verify-token-audience", true)
+                .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
+                .put("use-resource-role-mappings", true)
+                .put("confidential-port", 0)
+                .put("policy-enforcer", new JsonObject());
+
+        oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
+        OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
+
+        authHandler.setupCallback(router.get("/callback"));
+
+        router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
         final String keystorepass = config().getString("keystore.password", "password");
@@ -102,6 +121,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_256_GCM_SHA384")
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
+
+        registerHealthEndpoints(healthHandler);
+        router.get("/health").handler(healthHandler);
 
         vertx.createHttpServer(options)
                 .requestHandler(router)
@@ -148,24 +170,28 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
-        for (String service : Stream.of(tlcService, gwService, evService, dbService, keycloakService).collect(Collectors.toList())){
+        for (String service : Stream.of(tlcService, evService, dbService, keycloakService).collect(Collectors.toList())){
             //TODO this only checks if discovery has this service, not if this is reachable -> makes only sense with kubernetes
-            healthHandler.register(service,
-                    future -> HttpEndpoint.getClient(discovery,
-                            (rec) -> service.equals(rec.getName()),
-                            client -> {
-                                if (client.failed()) {
-                                    future.fail(client.cause());
-                                } else {
-                                    client.result().close();
-                                    future.complete(Status.OK());
-                                }
-                            }));
+            registerSingleHealthEndpoint(healthHandler, service);
         }
     }
 
+    private void registerSingleHealthEndpoint(HealthCheckHandler healthHandler, String service){
+        healthHandler.register(service,
+                future -> HttpEndpoint.getClient(discovery,
+                        (rec) -> service.equals(rec.getName()),
+                        client -> {
+                            if (client.failed()) {
+                                future.fail(client.cause());
+                            } else {
+                                client.result().close();
+                                future.complete(Status.OK());
+                            }
+                        }));
+    }
+
     private void dispatchRequests(RoutingContext context) {
-        logger.debug(printTime() + " Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
+        logger.debug("Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
         if(context.user() != null){
             logger.info("Request was sent from User "+ context.user());
         }
@@ -188,12 +214,13 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 // a relevant http client endpoint
                 Optional<Record> client = recordList.stream()
                         .filter(record -> record.getMetadata().getString("api.name") != null)
-                        .filter(record -> record.getMetadata().getString("api.name").equals(prefix))
+                        .filter(record -> record.getMetadata().getString("api.name").equals(prefix) ||
+                                record.getMetadata().getString("api.alt").equals(prefix))
                         .findAny();
 
                 if (client.isPresent() && client.get().getLocation().containsKey("endpoint")) {
                     String endpoint = client.get().getLocation().getString("endpoint");
-                    doDispatch(context, "/"+prefix+newPath, endpoint, promise);
+                    doDispatch(context, prefix+newPath, endpoint, promise);
                 } else {
                     notFound(context);
                     promise.complete();
@@ -227,8 +254,16 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setVerifyHost(true);
 
+        Set<String> userRoles = retrieveRoles(context);
+
         WebClient webClient = WebClient.create(vertx, options);
         HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
+        //TODO make this secure
+        for (String role : userRoles){
+            request.addQueryParam("role", role);
+        }
+        request.addQueryParam("username", context.user().principal().getString("username"));
+        request.addQueryParam("token", context.user().principal().getString("access_token"));
         if (context.request().headers().size() >= 1){
             request.putHeaders(context.request().headers());
         }
@@ -242,18 +277,45 @@ public class APIGatewayVerticle extends AbstractVerticle {
         }
     }
 
+    private Set<String> retrieveRoles(RoutingContext routingContext){
+        logger.debug(routingContext.user().principal());
+        JsonObject userJson = routingContext.user().principal();
+        if (userJson.containsKey("username")){
+            logger.info("User " + routingContext.user() + "authenticated");
+        }
+        if (userJson.containsKey("access_token")){
+            return getRolesFromToken(userJson);
+        } else {
+            logger.debug("Unauthorized Request");
+            return new HashSet<>();
+        }
+    }
+
+    private Set<String> getRolesFromToken(JsonObject principal) {
+        try {
+            String tokenStr = principal.getString("access_token");
+            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
+            Set<String> roles = token.getRealmAccess().getRoles();
+            return roles;
+        } catch (VerificationException | NullPointerException e) {
+            logger.info("Client could not be verified");
+            return new HashSet<>();
+        }
+    }
+
     private void handleAsyncResult(RoutingContext context, Promise<Object> promise, AsyncResult<HttpResponse<Buffer>> ar) {
         if (ar.succeeded()) {
             HttpResponse<Buffer> result = ar.result();
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
+            toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
-            promise.complete();
+            promise.tryComplete();
             logger.info("Request successfully handled");
         } else {
-            promise.fail("No response; timeout");
-            logger.info(printTime() + " Timeout on request");
+            promise.tryFail("No response; timeout");
+            logger.info("Timeout on request");
         }
     }
 
@@ -275,32 +337,20 @@ public class APIGatewayVerticle extends AbstractVerticle {
         final String DEFAULT_HOSTNAME = "localhost";
         final String DEFAULT_WEBROOT = "";
 
-        Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights"));
-        Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
+        Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights").put("api.alt", "groups"));
+        //Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
         Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
         Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
         Record record5 = HttpEndpoint.createRecord(keycloakService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_KC, DEFAULT_WEBROOT, new JsonObject());
         //publish all records
-        for (Record record: Stream.of(record1, record2, record3, record4, record5).collect(Collectors.toList())){
-            discovery.publish(record, ar -> {
-                if (ar.succeeded()){
-                    Record publishedRecord = ar.result();
-                    logger.debug("Service "+ publishedRecord.getName() + " published on endpoint " + publishedRecord.getLocation().getString("endpoint"));
-                } else {
-                    logger.error(printTime() + " Service" + record.getName() + " could not be published");
-                }
-            });
+        for (Record record: Stream.of(record1, record3, record4, record5).collect(Collectors.toList())){
+            publish(record);
         }
     }
 
-    private String printTime(){
-        return "Time: " + System.currentTimeMillis();
-    }
-
     protected void enableLocalSession(Router router) {
-        //router.route().handler(CookieHandler.create());
         router.route().handler(SessionHandler.create(
-                LocalSessionStore.create(vertx, "shopping.user.session")));
+                LocalSessionStore.create(vertx, "vertx-tlc")));
     }
 
     protected void badRequest(RoutingContext context, Throwable ex) {
@@ -331,22 +381,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
                         .encodePrettily());
     }
 
-
-    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
-        Record record = HttpEndpoint.createRecord(name, host, port, "/",
-                new JsonObject().put("api.name", config().getString("api.name", ""))
-        );
-        return publish(record);
-    }
-
     protected Future<Void> publishApiGateway(String host, int port) {
         Record record = HttpEndpoint.createRecord("api-gateway", true, host, port, "/", null)
                 .setType("api-gateway");
-        return publish(record);
-    }
-
-    protected Future<Void> publishJDBCDataSource(String name, JsonObject location) {
-        Record record = JDBCDataSource.createRecord(name, location, new JsonObject());
         return publish(record);
     }
 

@@ -8,6 +8,7 @@ import io.vertx.core.Vertx;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +19,7 @@ public class TLControllerServiceImpl implements TLControllerService {
     private Vertx vertx;
     private boolean interrupt;
 
-    private static int counter;
+    private int counter;
 
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
@@ -74,8 +75,11 @@ public class TLControllerServiceImpl implements TLControllerService {
                         });
                         break;
                     }
-                    //maintenance
-                    default: timePeriodic(60000);
+                    case MAINTENANCE:{
+                        logger.debug("MODE MAINTENANCE: Checking every 2 seconds if still in maintenance");
+                        timePeriodic(5000);
+                        break;
+                    }
                 }
             }
         });
@@ -100,8 +104,8 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type,  int groupId) {
-        return persistence.addTrafficLight(new TrafficLight(id, color, position, type, groupId));
+    public TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type) {
+        return persistence.addTrafficLight(new TrafficLight(id, color, position, type, 2));
     }
 
     @Override
@@ -110,7 +114,7 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public TrafficLight changeColor(int tlId, TLColor color) {
+    public TrafficLight changeToGenericColorOnManagerRequest(int tlId, TLColor color) {
         if(persistence.getTrafficLight(tlId).isPresent()){
             TrafficLight toUpdate = persistence.getTrafficLight(tlId).get();
             toUpdate.setColor(color);
@@ -127,9 +131,7 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public boolean changeToGreen(int tlId) {
-        //TODO get responsible party
-        String user = "someone";
+    public boolean changeToGreenOnEVRequest(int tlId, String user) {
         if(getSingleTLState(tlId).isPresent()){
             TrafficLight tl = getSingleTLState(tlId).get();
             if (TLType.VEHICLE.equals(tl.getType())){
@@ -144,5 +146,32 @@ public class TLControllerServiceImpl implements TLControllerService {
             }
         }
         return false;
+    }
+
+    @Override
+    public TLMode getGroupMode(int groupId) {
+        if (groupId == 1){
+            return intersection.getMode();
+        } else {
+            return persistence.getFreeTLMode();
+        }
+    }
+
+    @Override
+    public TLMode switchGroupMode(int groupId, TLMode newMode) {
+        if(groupId == 1){
+            TLMode confirmedMode = intersection.setMode(newMode);
+            if (newMode.equals(TLMode.MAINTENANCE)){
+                List<TrafficLight> toUpdate = new ArrayList<>();
+                for (TrafficLight tl: intersection.getTLList()){
+                    tl.setColor(TLColor.YELLOWBLINKING);
+                }
+                persistence.updateTrafficLightList(toUpdate);
+            }
+            interrupt = true;
+            return confirmedMode;
+        }else {
+            return persistence.switchModeOfFreeTLs(newMode);
+        }
     }
 }

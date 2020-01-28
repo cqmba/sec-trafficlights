@@ -1,9 +1,6 @@
 package de.tub.trafficlight.controller;
 
-import de.tub.trafficlight.controller.entity.TLColor;
-import de.tub.trafficlight.controller.entity.TLPosition;
-import de.tub.trafficlight.controller.entity.TLType;
-import de.tub.trafficlight.controller.entity.TrafficLight;
+import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.impl.TLControllerServiceImpl;
 import io.vertx.core.Vertx;
 
@@ -19,11 +16,15 @@ public interface TLControllerService {
 
     List<TrafficLight> getTLList();
 
-    TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type, int groupId);
+    TrafficLight addTL(int id, TLColor color, TLPosition position, TLType type);
 
     boolean removeTL(int tlId);
 
-    TrafficLight changeColor(int tlId, TLColor color);
+    TrafficLight changeToGenericColorOnManagerRequest(int tlId, TLColor color);
 
-    boolean changeToGreen(int tlId);
+    boolean changeToGreenOnEVRequest(int tlId, String user);
+
+    TLMode getGroupMode(int groupId);
+
+    TLMode switchGroupMode(int group, TLMode newMode);
 }
