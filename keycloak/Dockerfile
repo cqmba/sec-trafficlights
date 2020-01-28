@@ -1,7 +1,5 @@
 FROM jboss/keycloak
 
-MAINTAINER Carl J. Mosca <carljmosca@gmail.com>
-
 ENV JBOSS_HOME /opt/jboss/keycloak
 
 # setup SSL
