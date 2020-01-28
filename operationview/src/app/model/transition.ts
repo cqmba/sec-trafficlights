@@ -16,12 +16,22 @@ export const States = {
   GREEN: "GREEN",
   RED: "RED",
   YELLOW: "YELLOW",
-  RED_YELLOW: "RED_YELLOW",
-  YELLOW_BLINK: "YELLOW_BLINK"
+  RED_YELLOW: "YELLOWRED",
+  YELLOW_BLINK: "YELLOWBLINKING"
 };
 
 export const Modes = {
   MAINTENANCE: 'MAINTENANCE',
   SCHEDULED: 'SCHEDULED',
   ASSIGNED: 'ASSIGNED',
+};
+
+export const Health = {
+  HEALTHY: 'HEALTHY',
+  PROBLEM: 'PROBLEM'
+};
+
+export const Type = {
+  VEHICLE: 'VEHICLE',
+  PEDESTRIAN : 'PEDESTRIAN'
 }

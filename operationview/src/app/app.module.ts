@@ -16,6 +16,11 @@ import { DetailviewComponent } from './detailview/detailview.component';
 import { OverviewComponent } from './overview/overview.component';
 import { FooterComponent } from './footer/footer.component';
 import { AppRoutingModule } from './app-routing/app-routing.module';
+import { HttpClientModule }    from '@angular/common/http';
+import { AppAuthGuard } from './authguard';
+import { APP_INITIALIZER } from '@angular/core';
+import { KeycloakService, KeycloakAngularModule } from 'keycloak-angular';
+import { initializer } from './utils/app-init';
 
 @NgModule({
   declarations: [
@@ -36,9 +41,19 @@ import { AppRoutingModule } from './app-routing/app-routing.module';
     MatSlideToggleModule,
     MatInputModule,
     MatFormFieldModule,
-    MatSelectModule
+    MatSelectModule,
+    HttpClientModule,
+    KeycloakAngularModule
   ],
-  providers: [],
+  providers: [
+    AppAuthGuard,
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializer,
+      multi: true,
+      deps: [KeycloakService]
+    }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
