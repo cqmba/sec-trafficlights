@@ -191,7 +191,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void dispatchRequests(RoutingContext context) {
-        logger.debug(printTime() + " Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
+        logger.debug("Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
         if(context.user() != null){
             logger.info("Request was sent from User "+ context.user());
         }
@@ -315,7 +315,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
             logger.info("Request successfully handled");
         } else {
             promise.tryFail("No response; timeout");
-            logger.info(printTime() + " Timeout on request");
+            logger.info("Timeout on request");
         }
     }
 
@@ -347,25 +347,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
             publish(record);
         }
     }
-
-    private String printTime(){
-        return "Time: " + System.currentTimeMillis();
-    }
-
-    private boolean hasRealmRole(String role, String at) {
-
-        try {
-            AccessToken token = TokenVerifier.create(at, AccessToken.class).getToken();
-            if (token.getRealmAccess().getRoles().contains(role)){
-                return true;
-            }
-            logger.info("Client does not have needed role associated with his token, role: " + role);
-        } catch (VerificationException | NullPointerException e) {
-            logger.info("Client could not be verified");
-        }
-        return false;
-    }
-
 
     protected void enableLocalSession(Router router) {
         router.route().handler(SessionHandler.create(
