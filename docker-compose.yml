@@ -18,6 +18,9 @@ services:
       - 3306:3306
   keycloak:
     image: jboss/keycloak
+    build:
+      context: ./keycloak/
+      dockerfile: ./Dockerfile
     environment:
       DB_VENDOR: MYSQL
       DB_ADDR: mysql
@@ -31,23 +34,22 @@ services:
       # Uncomment the line below if you want to specify JDBC parameters. The parameter below is just an example, and it shouldn't be used in production without knowledge. It is highly recommended that you read the MySQL JDBC driver documentation in order to use it.
       #JDBC_PARAMS: "connectTimeout=30000"
     ports:
-      - 8080:8080
+      - "8089:8080"
+      - "8443:8443"
     depends_on:
       - mysql
 
-      # version: '3.7'
-      # services:
+# version: '3.7'
+# services:
 
-      #   hello:
-      #     container_name: testapi
-      #     build:
-      #       context: ./hello-world/
-      #       dockerfile: ./Dockerfile
-      #     ports:
-      #       - "8080:8080"
-      #     deploy:
-      #       replicas: 1
-      #       restart_policy:
-      #         condition: on-failure
-
-        
+#   hello:
+#     container_name: testapi
+#     build:
+#       context: ./hello-world/
+#       dockerfile: ./Dockerfile
+#     ports:
+#       - "8080:8080"
+#     deploy:
+#       replicas: 1
+#       restart_policy:
+#         condition: on-failure

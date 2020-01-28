@@ -20,7 +20,7 @@ import org.apache.logging.log4j.Logger;
 public class EVDispatchServiceImpl implements EVDispatchService {
 
     private static final String BASE_TLC_API = "api/lights/";
-    private static final String TOKEN_PATH = "http://localhost:8080/auth/realms/vertx/protocol/openid-connect/token";
+    private static final String TOKEN_PATH = "https://localhost:8443/auth/realms/vertx/protocol/openid-connect/token";
     private static final String AUTH_CLIENTID = "vertx-test2";
     private static final String CLIENT_SECRET = "ab4bf0ae-6b51-47e6-ba89-4455c5a0a825";
 
