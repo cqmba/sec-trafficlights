@@ -92,7 +92,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
         JsonObject keycloakJson = new JsonObject()
                 .put("realm", "vertx")
-                .put("auth-server-url", "http://localhost:8080/auth")
+                .put("auth-server-url", "https://localhost:8443/auth")
                 .put("ssl-required", "external")
                 .put("resource", "vertx-tlc2")
                 .put("verify-token-audience", true)
