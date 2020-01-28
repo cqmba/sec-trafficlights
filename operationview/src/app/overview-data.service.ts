@@ -4,6 +4,7 @@ import { Transition, States } from './model/transition';
 import { Observable, of, timer, Subject } from 'rxjs';
 import {take} from 'rxjs/operators';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { KeycloakService} from 'keycloak-angular';
 
 @Injectable({
   providedIn: 'root'
@@ -64,8 +65,14 @@ export class OverviewDataService {
   }
 
 
-  constructor(private httpClient: HttpClient) {
-    this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
+  constructor(private httpClient: HttpClient, s : KeycloakService) {
+    const httpOptions = {
+        headers: new HttpHeaders({
+          'Authorization': ("Bearer "+s.getToken()),
+        })
+      };
+
+    this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights", httpOptions).subscribe(list =>{
       this.tlList.next(list);
     });
     this.update();
