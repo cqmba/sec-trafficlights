@@ -311,10 +311,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
             toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
-            promise.complete();
+            promise.tryComplete();
             logger.info("Request successfully handled");
         } else {
-            promise.fail("No response; timeout");
+            promise.tryFail("No response; timeout");
             logger.info(printTime() + " Timeout on request");
         }
     }
