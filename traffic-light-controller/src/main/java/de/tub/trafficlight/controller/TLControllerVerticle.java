@@ -16,10 +16,11 @@ import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.keycloak.TokenVerifier;
+import org.keycloak.common.VerificationException;
+import org.keycloak.representations.AccessToken;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class TLControllerVerticle extends AbstractVerticle {
 
@@ -79,6 +80,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetGroup(RoutingContext routingContext){
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String grId = routingContext.request().getParam("grId");
         int groupId;
         try {
@@ -98,6 +104,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPutGroupMode(RoutingContext routingContext){
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "admin"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String grId = routingContext.request().getParam("grId");
         int groupId;
         try {
@@ -123,6 +134,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String tlId = routingContext.request().getParam("tlId");
         int id;
         try {
@@ -148,6 +164,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPostSingle(RoutingContext routingContext) {
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
         TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", TLPosition.UNSPECIFIED.toString()));
@@ -181,6 +202,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetSingle(RoutingContext routingContext) {
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String tlId = routingContext.request().getParam("tlId");
         int id;
         try {
@@ -201,6 +227,11 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetAll(RoutingContext routingContext) {
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         try {
             List<TrafficLight> tlList = service.getTLList();
             routingContext.response()
@@ -211,7 +242,24 @@ public class TLControllerVerticle extends AbstractVerticle {
         }
     }
 
+    private boolean isAuthorized(RoutingContext routingContext, Set<String> acceptedRoles) {
+        MultiMap params = routingContext.request().params();
+        String token = params.get("token");
+        Set<String> roles = getRolesFromToken(token);
+        for (String role : acceptedRoles){
+            if(acceptedRoles.contains(role)){
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void apiChangeColor(RoutingContext routingContext){
+        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "ev"));
+        if(!isAuthorized(routingContext, acceptedRoles)){
+            logger.info("User is not authorized to access resource");
+            routingContext.fail(403);
+        }
         String tlId = routingContext.request().getParam("tlId");
         JsonObject json = routingContext.getBodyAsJson();
         TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
@@ -234,28 +282,14 @@ public class TLControllerVerticle extends AbstractVerticle {
             badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
             return;
         }
-        //TODO clean
-        MultiMap params = routingContext.request().params();
-        List<String> roles = params.getAll("role");
-        String username = params.get("username");
-        if (!username.isEmpty()){
-            logger.info("User " + username + "authenticated");
-        } else {
-            logger.info("Unable to authenticate user, aborting");
-            badRequest(routingContext, new Exception("Unable to authenticate username"));
-            return;
-        }
-        if (roles.contains("ev") || roles.contains("manager")){
-            doChangeColor(routingContext, id, color, roles, username);
-        } else {
-            logger.debug("Unauthorized Request");
-            badRequest(routingContext, new Exception("Unauthorized Request"));
-        }
-    }
-
-    private void doChangeColor(RoutingContext routingContext, int id, TLColor color, List<String> roles, String username){
-        //now we have working ID, group and new color
-        if(roles.contains("ev") && color.equals(TLColor.GREEN)){
+        String username = "placeholder";
+        Set<String> roles = getRolesFromToken(routingContext.request().params().get("token"));
+        if (roles.contains("manager")){
+            logger.debug("TLC-Manager Requested Color Assignment from user " + username);
+            routingContext.response()
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
+        } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
             if (service.changeToGreenOnEVRequest(id, username)){
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
@@ -264,13 +298,8 @@ public class TLControllerVerticle extends AbstractVerticle {
                 logger.debug("Couldnt execute green Light change.");
                 internalError(routingContext, new Exception("Unable to switch to green light"));
             }
-        } else if (roles.contains("manager")){
-            logger.debug("TLC-Manager Requested Color Assignment from user " + username);
-            routingContext.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
         } else {
-            badRequest(routingContext, new Exception("Unauthorized Request"));
+            routingContext.fail(403);
         }
     }
 
@@ -283,6 +312,17 @@ public class TLControllerVerticle extends AbstractVerticle {
             }
         }
         return null;
+    }
+
+    private Set<String> getRolesFromToken(String tokenStr) {
+        try {
+            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
+            Set<String> roles = token.getRealmAccess().getRoles();
+            return roles;
+        } catch (VerificationException | NullPointerException e) {
+            logger.info("Client could not be verified");
+            return new HashSet<>();
+        }
     }
 
     protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {

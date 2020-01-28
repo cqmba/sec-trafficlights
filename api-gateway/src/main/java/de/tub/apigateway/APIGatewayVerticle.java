@@ -263,6 +263,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
             request.addQueryParam("role", role);
         }
         request.addQueryParam("username", context.user().principal().getString("username"));
+        request.addQueryParam("token", context.user().principal().getString("access_token"));
         if (context.request().headers().size() >= 1){
             request.putHeaders(context.request().headers());
         }
