@@ -308,9 +308,8 @@ public class APIGatewayVerticle extends AbstractVerticle {
             HttpResponse<Buffer> result = ar.result();
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
-            //TODO fix
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
-            //toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
+            toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
             promise.complete();
             logger.info("Request successfully handled");
