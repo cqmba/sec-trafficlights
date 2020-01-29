@@ -38,6 +38,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * The main Verticle Class for the API Gateway, implementing Service Discovery, Circuit Breaker,
+ * Dispatching Requests, Health Check and Authentication/Authorization
+ */
 public class APIGatewayVerticle extends AbstractVerticle {
 
     private static final int DEFAULT_PORT_GW = 8787;
@@ -57,6 +61,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
+    /**This is called when the Verticle Instance is deployed.
+     * @param promise A promise which is called when the startup is complete.
+     * @throws Exception
+     */
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start();
@@ -317,6 +325,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
         return promise.future();
     }
 
+    /**Stops the verticle when the instance is undeployed and does cleanup.
+     * @param promise A promise that is called when the cleanup is complete.
+     * @throws Exception
+     */
     @Override
     public void stop(Promise<Void> promise) throws Exception {
         List<Promise> promises = new ArrayList<>();

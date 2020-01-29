@@ -12,6 +12,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Implements the Intersection Service, which allows modelling an Intersection, changing its state and mode, and retrieving its TrafficLights
+ */
 public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicService{
 
     private static final Logger logger = LogManager.getLogger(TLIntersectionLogicServiceImpl.class);
@@ -28,6 +31,11 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     private TLPersistenceService persistence;
     private IntersectionEmergencyService emergencyService;
 
+    /**Constructs an Intersection with a set of given TrafficLights.
+     * @param groupId the GroupId of the Intersection
+     * @param persistence The current Persistence Service
+     * @param emergencyService THe current Emergency Service
+     */
     public TLIntersectionLogicServiceImpl(int groupId, TLPersistenceService persistence, IntersectionEmergencyService emergencyService){
         this.persistence = persistence;
         this.emergencyService = emergencyService;

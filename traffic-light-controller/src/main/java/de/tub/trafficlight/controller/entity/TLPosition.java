@@ -1,5 +1,8 @@
 package de.tub.trafficlight.controller.entity;
 
+/**
+ * The Position where a Traffic Light is located
+ */
 public enum TLPosition {
     MAIN_ROAD_WEST {
         @Override

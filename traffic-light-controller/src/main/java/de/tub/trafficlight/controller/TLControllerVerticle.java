@@ -25,6 +25,9 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 
+/**
+ * The main Verticle Class with all the REST Methods
+ */
 public class TLControllerVerticle extends AbstractVerticle {
 
     private static final String SERVICE_NAME = "traffic-light-service";
@@ -39,6 +42,10 @@ public class TLControllerVerticle extends AbstractVerticle {
 
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
+    /**This is called when the Verticle Instance is deployed.
+     * @param promise A promise which is called when the startup is complete.
+     * @throws Exception
+     */
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start(promise);
@@ -404,6 +411,10 @@ public class TLControllerVerticle extends AbstractVerticle {
         return promise.future();
     }
 
+    /**Stops the verticle when the instance is undeployed and does cleanup.
+     * @param promise A promise that is called when the cleanup is complete.
+     * @throws Exception
+     */
     @Override
     public void stop(Promise<Void> promise) {
         List<Promise> promises = new ArrayList<>();

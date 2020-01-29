@@ -13,6 +13,9 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Implements the Emergency Service, where Emergency Vehicle Incidents can be added, handled and updated.
+ */
 public class IntersectionEmergencyServiceImpl implements IntersectionEmergencyService {
 
     private static final AtomicInteger COUNTER = new AtomicInteger();

@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Implements the Controller Service, which handles how the Intersection States are timed and managed.
+ */
 public class TLControllerServiceImpl implements TLControllerService {
 
     private TLPersistenceService persistence;
@@ -25,6 +28,10 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
+
+    /**Constructs a new instance and instanciates persistence, emergency and intersection Services
+     * @param vertx The current vertx Instance.
+     */
     public TLControllerServiceImpl(Vertx vertx){
         persistence = TLPersistenceService.getInstance();
         emergency = IntersectionEmergencyService.getInstance();
@@ -35,14 +42,17 @@ public class TLControllerServiceImpl implements TLControllerService {
         startSchedule();
     }
 
+    /**
+     * Sets the first Timer and initializes the Intersection, then calls the periodic scheduling
+     */
     private void startSchedule() {
         List<TrafficLight> trafficLights = intersection.getTLList();
         try {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
-                throw new Exception("Error: Failed to initialize Intersection and TL State");
+                throw new RuntimeException("Error: Failed to initialize Intersection and TL State");
             }
             logger.debug("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
-        }catch (Exception ex){
+        }catch (RuntimeException ex){
             logger.error(ex.getMessage());
         }
         vertx.setTimer(25000, event -> {
@@ -53,6 +63,11 @@ public class TLControllerServiceImpl implements TLControllerService {
         });
     }
 
+
+    /**Checks periodically, if interrupts need to be handled or the timer is met, then handles it
+     * according to the Intersection Mode.
+     * @param time Time after wich the timed event executes in ms
+     */
     private void timePeriodic(int time){
         counter = 0;
         final int interval = 1000;
@@ -88,6 +103,9 @@ public class TLControllerServiceImpl implements TLControllerService {
         });
     }
 
+    /**
+     * Makes an Intersection Transition, updates the states in the persistence and resets the timer
+     */
     private void executeTransitionAndSetNewTimer(){
         intersection.doTransition();
         persistence.updateTrafficLightList(intersection.getTLList());

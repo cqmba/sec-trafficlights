@@ -2,6 +2,9 @@ package de.tub.trafficlight.controller.entity;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * An Object that models the State and Metadata of a single Traffic Light
+ */
 public class TrafficLight {
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private int id;

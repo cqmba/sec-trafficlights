@@ -1,5 +1,8 @@
 package de.tub.trafficlight.controller.entity;
 
+/**
+ * The Emergency Vehicle Incident, after a Green Light was requested
+ */
 public class TLIncident {
 
     private final TLPosition position;

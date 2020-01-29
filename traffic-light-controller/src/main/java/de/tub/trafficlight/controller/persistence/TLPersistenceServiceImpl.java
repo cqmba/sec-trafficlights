@@ -10,6 +10,9 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+/**
+ * Implementation Class of the Persistence Service
+ */
 public class TLPersistenceServiceImpl implements TLPersistenceService {
 
     private static final Logger logger = LogManager.getLogger(TLPersistenceServiceImpl.class);
@@ -17,6 +20,9 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
     private Map<Integer, TrafficLight> tlRepo;
     private TLMode freeTLMode;
 
+    /**
+     * Constructor
+     */
     public TLPersistenceServiceImpl(){
         tlRepo = new HashMap<>();
         freeTLMode = TLMode.SCHEDULED;
@@ -27,6 +33,7 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
         return tlRepo.values().stream().filter(p).collect(Collectors.toList());
     }
 
+    @Override
     public List<TrafficLight> getAllTrafficLights() {
         return new ArrayList<>(tlRepo.values());
     }

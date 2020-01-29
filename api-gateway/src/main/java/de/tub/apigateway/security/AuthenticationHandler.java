@@ -10,11 +10,17 @@ import org.keycloak.representations.AccessToken;
 
 import java.util.Set;
 
+/**
+ * Handler Class that authenticates the Client based on Username and Looks up the Realm Roles by leveraging the access Token
+ */
 public class AuthenticationHandler {
 
     private static final Logger logger = LogManager.getLogger(AuthenticationHandler.class);
 
-
+    /**Authenticates the Request based on the information within the token of the Request and logs identifying information.
+     * @param routingContext RoutingContext of the current Request being handled
+     * @throws AuthenticationException when a Request cant be authenticated
+     */
     public static void authenticateAndLogRequest(RoutingContext routingContext) throws AuthenticationException{
         logger.debug("Source IP " + routingContext.request().remoteAddress() +" requests resource " +routingContext.request().absoluteURI());
         JsonObject userJson = routingContext.user().principal();
@@ -33,6 +39,11 @@ public class AuthenticationHandler {
         }
     }
 
+    /**Retrieves the realm roles from the Access Token.
+     * @param principal The JsonObject of the User responsible for the Request
+     * @return Set of associated Roles to the User
+     * @throws AuthenticationException when the Client has no valid Realm Roles or cannot be verified.
+     */
     private static Set<String> getRolesFromToken(JsonObject principal) throws AuthenticationException{
         try {
             String tokenStr = principal.getString("access_token");

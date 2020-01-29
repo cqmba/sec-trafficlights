@@ -16,6 +16,9 @@ import io.vertx.ext.web.client.WebClientOptions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+/**
+ * Implements the EV Dispatch Service
+ */
 public class EVDispatchServiceImpl implements EVDispatchService {
 
     private static final String BASE_TLC_API = "api/lights/";
@@ -30,6 +33,11 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     private static final int MOCKED_SENSOR_ID = 1;
     private static final int SENSOR_INTERVAL = 1000;
 
+    /**Constructor of the Dispatch Service, which returns a new Instance with configured TLS and Auth Settings, loaded from Vertx Config.
+     * @param endpoint The absolute URI of the targeted Service
+     * @param vertx The current Vertx instance
+     * @param config The passed Vertx config
+     */
     public EVDispatchServiceImpl(String endpoint, Vertx vertx, JsonObject config) {
         this.endpoint = endpoint;
         this.vertx = vertx;
@@ -57,6 +65,11 @@ public class EVDispatchServiceImpl implements EVDispatchService {
         pullSensorPeriodically();
     }
 
+
+    /**
+     * Mocks how a periodical pulling of a sensor could look like.
+     * If a true value is detected, the Green-Light Request is delegated.
+     */
     private void pullSensorPeriodically(){
         vertx.setPeriodic(SENSOR_INTERVAL, event -> {
             if (MOCKED_SENSOR_RESULT){
@@ -65,13 +78,19 @@ public class EVDispatchServiceImpl implements EVDispatchService {
         });
     }
 
-
+    /**Mocks a detected Emergency Vehicle and initiates a Green-Light request at the corresponding Traffic Light.
+     * @param id Id of the targeted Traffic Light.
+     * @param routingContext Current Request RoutingContext
+     */
     @Override
     public void sendSensorDetection(int id, RoutingContext routingContext) {
         //manually triggered
         authenticateAndDelegateToAPIonRequest(id, routingContext);
     }
 
+    /**Authenticates the Service by leveraging the Auth Service. On success, delegates to dispatching the Request.
+     * @param id The targeted Traffic Light Id.
+     */
     private void authenticateAndDelegateToAPI(int id){
         JsonObject tokenConfig = new JsonObject();
         oauth2.authenticate(tokenConfig, res -> {
@@ -89,6 +108,10 @@ public class EVDispatchServiceImpl implements EVDispatchService {
         });
     }
 
+    /**Authenticates the Service by leveraging the Auth Service. On success, delegates to dispatching the Request.
+     * @param id The targeted Traffic Light Id.
+     * @param routingContext The current Routing Context.
+     */
     private void authenticateAndDelegateToAPIonRequest(int id, RoutingContext routingContext){
         JsonObject tokenConfig = new JsonObject();
         oauth2.authenticate(tokenConfig, res -> {
@@ -106,6 +129,11 @@ public class EVDispatchServiceImpl implements EVDispatchService {
         });
     }
 
+    /**Dispatches the EV Green-Light Requests that was mocked by a API Request for Presentation purposes
+     * @param user The Authenticated User.
+     * @param id The targeted Traffic Light Id.
+     * @param routingContext The current RoutingContext
+     */
     private void doDispatchToAPIonRequest(User user, int id, RoutingContext routingContext){
         final String path = BASE_TLC_API + id +"/colors";
         JsonObject payload = new JsonObject().put("color", "GREEN").put("group", 1);
@@ -126,6 +154,10 @@ public class EVDispatchServiceImpl implements EVDispatchService {
                 });
     }
 
+    /**Dispatches a EV Green-Light Request.
+     * @param user The authenticated User.
+     * @param id The targeted Traffic Light.
+     */
     private void doDispatchToAPI(User user, int id){
         //sensor triggered
         final String path = BASE_TLC_API + id +"/colors";
