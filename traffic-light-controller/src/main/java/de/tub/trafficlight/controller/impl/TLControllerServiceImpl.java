@@ -2,6 +2,7 @@ package de.tub.trafficlight.controller.impl;
 
 import de.tub.trafficlight.controller.TLControllerService;
 import de.tub.trafficlight.controller.entity.*;
+import de.tub.trafficlight.controller.logic.IntersectionEmergencyService;
 import de.tub.trafficlight.controller.logic.TLIntersectionLogicService;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
 import io.vertx.core.Vertx;
@@ -16,6 +17,7 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     private TLPersistenceService persistence;
     private TLIntersectionLogicService intersection;
+    private IntersectionEmergencyService emergency;
     private Vertx vertx;
     private boolean interrupt;
 
@@ -25,7 +27,8 @@ public class TLControllerServiceImpl implements TLControllerService {
     private static final int MAIN_INTERSECTION_GROUP = 1;
     public TLControllerServiceImpl(Vertx vertx){
         persistence = TLPersistenceService.getInstance();
-        intersection = TLIntersectionLogicService.getInstance(MAIN_INTERSECTION_GROUP, persistence);
+        emergency = IntersectionEmergencyService.getInstance();
+        intersection = TLIntersectionLogicService.getInstance(MAIN_INTERSECTION_GROUP, persistence, emergency);
         this.vertx = vertx;
         this.interrupt = false;
         counter = 0;
@@ -135,7 +138,7 @@ public class TLControllerServiceImpl implements TLControllerService {
         if(getSingleTLState(tlId).isPresent()){
             TrafficLight tl = getSingleTLState(tlId).get();
             if (TLType.VEHICLE.equals(tl.getType())){
-                persistence.addIncident(new TLIncident(tl.getPosition(), TLIncident.STATE.UNRESOLVED));
+                emergency.addIncident(new TLIncident(tl.getPosition(), TLIncident.STATE.UNRESOLVED));
                 this.interrupt = true;
                 logger.debug("New Incident added: EV requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
                 return true;

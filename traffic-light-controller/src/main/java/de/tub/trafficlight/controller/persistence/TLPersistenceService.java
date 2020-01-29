@@ -30,18 +30,6 @@ public interface TLPersistenceService {
 
     List<TrafficLight> addTrafficLightList(List<TrafficLight> tlList);
 
-    List<TLIncident> getFilteredIncidents(Predicate<TLIncident> filter);
-
-    void addIncident(TLIncident incident);
-
-    Optional<TLIncident> getNextUnresolvedIncident();
-
-    Optional<TLIncident> updateIncident(Optional<TLIncident> incident, boolean mainGreen, boolean sideGreen);
-
-    void resolveSideRoadIncidents();
-
-    void resolveMainRoadIncidents();
-
     TLMode switchModeOfFreeTLs(TLMode newMode);
 
     TLMode getFreeTLMode();

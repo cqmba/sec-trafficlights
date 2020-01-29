@@ -9,8 +9,8 @@ import java.util.List;
 
 public interface TLIntersectionLogicService {
 
-    static TLIntersectionLogicService getInstance(int groupId, TLPersistenceService persistence){
-        return new TLIntersectionLogicServiceImpl(groupId, persistence);
+    static TLIntersectionLogicService getInstance(int groupId, TLPersistenceService persistence, IntersectionEmergencyService emergency){
+        return new TLIntersectionLogicServiceImpl(groupId, persistence, emergency);
     }
 
     TLMode getMode();
