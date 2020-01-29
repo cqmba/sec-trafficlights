@@ -25,8 +25,6 @@ import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.OAuth2AuthHandler;
-import io.vertx.ext.web.handler.SessionHandler;
-import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
@@ -63,7 +61,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start();
-        //initConfig();
         discovery = ServiceDiscovery.create(vertx);
         initCircuitBreaker();
         //TODO Kubernetes Discovery
@@ -77,8 +74,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
         Router router = Router.router(vertx);
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
 
-
-        //enableLocalSession(router);
         router.route().handler(BodyHandler.create());
         router.get("/api/v").handler(this::apiVersion);
 
@@ -88,7 +83,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>This is the gateway, please use the API</h1>");
         });
-
 
         JsonObject keycloakJson = new JsonObject()
                 .put("realm", "vertx")
@@ -138,25 +132,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 });
     }
 
-    /*private void initConfig(){
-        ConfigStoreOptions fileStore = new ConfigStoreOptions().setType("file").setConfig(new JsonObject().put("path", "config.json"));
-        ConfigRetrieverOptions configOptions = new ConfigRetrieverOptions().addStore(fileStore);
-        ConfigRetriever retriever = ConfigRetriever.create(vertx, configOptions);
-        retriever.getConfig(ar -> {
-            if (ar.succeeded() && !config().containsKey("keystore.password")){
-                logger.debug("Config successfully loaded");
-                JsonObject result = ar.result();
-                vertx.close();
-                // Create a new Vert.x instance using the retrieve configuration
-                VertxOptions options = new VertxOptions(result);
-                Vertx newVertx = Vertx.vertx(options);
-                newVertx.deployVerticle(APIGatewayVerticle.class.getName());
-            }else {
-                logger.error("Could not load config.");
-            }
-        });
-    }*/
-
     private void initCircuitBreaker(){
         JsonObject cbOptions = config().getJsonObject("circuit-breaker") != null ?
                 config().getJsonObject("circuit-breaker") : new JsonObject();
@@ -171,7 +146,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
         for (String service : Stream.of(tlcService, evService, dbService, keycloakService).collect(Collectors.toList())){
-            //TODO this only checks if discovery has this service, not if this is reachable -> makes only sense with kubernetes
             registerSingleHealthEndpoint(healthHandler, service);
         }
     }
@@ -254,15 +228,8 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setVerifyHost(true);
 
-        Set<String> userRoles = retrieveRoles(context);
-
         WebClient webClient = WebClient.create(vertx, options);
         HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
-        //TODO make this secure
-        for (String role : userRoles){
-            request.addQueryParam("role", role);
-        }
-        request.addQueryParam("username", context.user().principal().getString("username"));
         request.addQueryParam("token", context.user().principal().getString("access_token"));
         if (context.request().headers().size() >= 1){
             request.putHeaders(context.request().headers());
@@ -332,13 +299,11 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void mockDiscoveryEndpoints(){
-        //TODO make discovery work
         final boolean ssl = true;
         final String DEFAULT_HOSTNAME = "localhost";
         final String DEFAULT_WEBROOT = "";
 
         Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights").put("api.alt", "groups"));
-        //Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
         Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
         Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
         Record record5 = HttpEndpoint.createRecord(keycloakService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_KC, DEFAULT_WEBROOT, new JsonObject());
@@ -347,28 +312,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
             publish(record);
         }
     }
-
-    protected void enableLocalSession(Router router) {
-        router.route().handler(SessionHandler.create(
-                LocalSessionStore.create(vertx, "vertx-tlc")));
-    }
-
-    protected void badRequest(RoutingContext context, Throwable ex) {
-        context.response().setStatusCode(400)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
-    }
-
     protected void notFound(RoutingContext context) {
         context.response().setStatusCode(404)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("message", "not_found").encodePrettily());
-    }
-
-    protected void internalError(RoutingContext context, Throwable ex) {
-        context.response().setStatusCode(500)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
     }
 
     protected void badGateway(Throwable ex, RoutingContext context) {

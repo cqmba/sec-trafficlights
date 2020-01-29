@@ -292,46 +292,54 @@ public class TLControllerVerticle extends AbstractVerticle {
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String tlId = routingContext.request().getParam("tlId");
-        JsonObject json = routingContext.getBodyAsJson();
-        TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
-        if (color == null){
-            logger.debug("Color not matching possible options");
-            badRequest(routingContext, new Exception("Color not matching possible options"));
-            return;
-        }
-        int group = json.getInteger("group");
-        int id;
         try {
-            id = Integer.parseInt(tlId);
-        } catch (Exception ex){
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
-        }
-        if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
-            logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
-            badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
-            return;
-        }
-        Set<String> roles = AuthorizationHandler.getRolesFromToken(routingContext.request().params().get("token"));
-        if (roles.contains("manager")){
-            logger.debug("TLC-Manager Requested Color Assignment from user " + username);
-            routingContext.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
-        } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
-            if (service.changeToGreenOnEVRequest(id, username)){
+            int group = routingContext.getBodyAsJson().getInteger("group");
+            int id = retrieveTLId(routingContext);
+            TLColor color = retrieveTLColor(routingContext);
+            if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
+                logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
+                badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
+                return;
+            }
+            Set<String> roles = AuthorizationHandler.getRolesFromToken(routingContext.request().params().get("token"));
+            if (roles.contains("manager")){
+                logger.debug("TLC-Manager Requested Color Assignment from user " + username);
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
-                        .end(Json.encodePrettily(new JsonObject().put("message", "success")));
+                        .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
+            } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
+                if (service.changeToGreenOnEVRequest(id, username)){
+                    routingContext.response()
+                            .putHeader("content-type", "application/json; charset=utf-8")
+                            .end(Json.encodePrettily(new JsonObject().put("message", "success")));
+                } else {
+                    logger.debug("Couldnt execute green Light change.");
+                    internalError(routingContext, new Exception("Unable to switch to green light"));
+                }
             } else {
-                logger.debug("Couldnt execute green Light change.");
-                internalError(routingContext, new Exception("Unable to switch to green light"));
+                routingContext.fail(403);
             }
-        } else {
-            routingContext.fail(403);
+         } catch (BadRequestException ex){
+             badRequest(routingContext, ex);
+         }
+    }
+
+    private int retrieveTLId(RoutingContext routingContext) throws BadRequestException {
+        String tlId = routingContext.request().getParam("tlId");
+        try {
+            return Integer.parseInt(tlId);
+        } catch (NumberFormatException ex){
+            logger.debug("ID could not be parsed to int");
+            throw new BadRequestException("ID could not be parsed to int");
         }
+    }
+
+    private TLColor retrieveTLColor(RoutingContext routingContext) throws BadRequestException{
+        TLColor color = getEnumFromString(TLColor.class, routingContext.getBodyAsJson().getString("color", "GREEN"));
+        if (color == null){
+            logger.debug("Color not matching possible options");
+            throw new BadRequestException("Color not matching possible options");
+        } else return color;
     }
 
     private static <T extends Enum<T>> T getEnumFromString(Class<T> c, String string) {

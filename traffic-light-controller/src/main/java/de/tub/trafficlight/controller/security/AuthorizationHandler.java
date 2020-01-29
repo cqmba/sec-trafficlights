@@ -25,8 +25,6 @@ public class AuthorizationHandler {
         return false;
     }
 
-
-
     public static String getUsername(RoutingContext routingContext){
         MultiMap params = routingContext.request().params();
         String tokenStr = params.get("token");
@@ -42,8 +40,7 @@ public class AuthorizationHandler {
     public static Set<String> getRolesFromToken(String tokenStr) {
         try {
             AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
-            Set<String> roles = token.getRealmAccess().getRoles();
-            return roles;
+            return token.getRealmAccess().getRoles();
         } catch (VerificationException | NullPointerException e) {
             LogManager.getLogger().info("Client could not be verified");
             return new HashSet<>();
