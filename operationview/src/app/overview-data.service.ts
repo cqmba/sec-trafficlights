@@ -67,13 +67,6 @@ export class OverviewDataService {
 
 
   constructor(private httpClient: HttpClient, s : KeycloakService) {
-    s.getToken().then(data => {
-      console.log(data);
-      //const httpOptions = {
-        //   headers: new HttpHeaders({
-        //     'Authorization': ("Bearer "+data),
-        //   })
-        // };
         this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").pipe(catchError(this.handleError<TrafficLight[]>('/lights', [])))
 
         this.update();
@@ -83,8 +76,6 @@ export class OverviewDataService {
           });
         }, 2000);
 
-
-    });
   }
 
   private handleError<T> (operation = 'operation', result?: T) {
@@ -93,8 +84,7 @@ export class OverviewDataService {
     // TODO: send the error to remote logging infrastructure
     console.error(error); // log to console instead
 
-    // TODO: better job of transforming error for user consumption
-    //this.log(`${operation} failed: ${error.message}`);
+
 
     // Let the app keep running by returning an empty result.
     return of(result as T);

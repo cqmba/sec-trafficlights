@@ -161,14 +161,12 @@ public class APIGatewayVerticle extends AbstractVerticle {
     
     private void addHeaders(RoutingContext rc) {
  	   rc.response().headers().add("Access-Control-Allow-Origin", "http://localhost:4200");
- 	   System.out.println("HELLO STANDADHEADERADD");
  	   rc.next();
     }
     
     private void sendDefaultOptions(RoutingContext rc) {
  	   rc.response().headers().add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PUT")
  	   .add("Access-Control-Allow-Headers", "authorization");
- 	   System.out.println("HELLO options");
  	   rc.response().end();
     }
     private void initCircuitBreaker(){
