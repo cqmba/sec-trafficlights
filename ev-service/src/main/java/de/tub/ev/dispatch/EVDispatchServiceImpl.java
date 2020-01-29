@@ -29,16 +29,13 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     private static final boolean MOCKED_SENSOR_RESULT = false;
     private static final int MOCKED_SENSOR_ID = 1;
     private static final int SENSOR_INTERVAL = 1000;
-    private String token_path;
-    private String auth_clientId;
-    private String client_secret;
 
     public EVDispatchServiceImpl(String endpoint, Vertx vertx, JsonObject config) {
         this.endpoint = endpoint;
         this.vertx = vertx;
-        this.token_path = config.getString("token.path");
-        this.auth_clientId = config.getString("auth.clientid");
-        this.client_secret = config.getString("client.secret");
+        String token_path = config.getString("token.path");
+        String auth_clientId = config.getString("auth.clientid");
+        String client_secret = config.getString("client.secret");
         //the real values are loaded from vertx config, these are default values
         String truststorepath = config.getString("truststore.path", "ev_truststore.jks");
         String truststorepass = config.getString("truststore.pass", "password");

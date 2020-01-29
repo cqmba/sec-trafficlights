@@ -1,6 +1,5 @@
 package de.tub.trafficlight.controller.persistence;
 
-import de.tub.trafficlight.controller.entity.TLIncident;
 import de.tub.trafficlight.controller.entity.TLMode;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 

@@ -1,17 +1,14 @@
 package de.tub.trafficlight.controller.persistence;
 
 import de.tub.trafficlight.controller.entity.TLColor;
-import de.tub.trafficlight.controller.entity.TLIncident;
 import de.tub.trafficlight.controller.entity.TLMode;
 import de.tub.trafficlight.controller.entity.TrafficLight;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class TLPersistenceServiceImpl implements TLPersistenceService {
 
