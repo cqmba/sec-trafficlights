@@ -5,6 +5,7 @@ import { Observable, of, timer, Subject } from 'rxjs';
 import {take} from 'rxjs/operators';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { KeycloakService} from 'keycloak-angular';
+import { catchError, map, tap } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -14,7 +15,7 @@ export class OverviewDataService {
   private tlList: Subject<TrafficLight[]> = new Subject<TrafficLight[]>();
   private http : HttpClient;
 
-  BASE_URL : string = "https://localhost:8086"
+  BASE_URL : string = "https://localhost:8787/api"
 
   constructSampleData(): void{
 
@@ -66,22 +67,39 @@ export class OverviewDataService {
 
 
   constructor(private httpClient: HttpClient, s : KeycloakService) {
-    const httpOptions = {
-        headers: new HttpHeaders({
-          'Authorization': ("Bearer "+s.getToken()),
-        })
-      };
+    s.getToken().then(data => {
+      console.log(data);
+      //const httpOptions = {
+        //   headers: new HttpHeaders({
+        //     'Authorization': ("Bearer "+data),
+        //   })
+        // };
+        this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").pipe(catchError(this.handleError<TrafficLight[]>('/lights', [])))
 
-    this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights", httpOptions).subscribe(list =>{
-      this.tlList.next(list);
+        this.update();
+        window.setInterval(fun => {
+          this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
+            this.tlList.next(list);
+          });
+        }, 2000);
+
+
     });
-    this.update();
-    window.setInterval(fun => {
-      this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
-        this.tlList.next(list);
-      });
-    }, 2000);
   }
+
+  private handleError<T> (operation = 'operation', result?: T) {
+  return (error: any): Observable<T> => {
+
+    // TODO: send the error to remote logging infrastructure
+    console.error(error); // log to console instead
+
+    // TODO: better job of transforming error for user consumption
+    //this.log(`${operation} failed: ${error.message}`);
+
+    // Let the app keep running by returning an empty result.
+    return of(result as T);
+  };
+}
 
   public update() : void {
     this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
