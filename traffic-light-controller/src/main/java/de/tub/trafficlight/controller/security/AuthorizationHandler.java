@@ -1,5 +1,6 @@
 package de.tub.trafficlight.controller.security;
 
+import de.tub.trafficlight.controller.exception.AuthenticationException;
 import io.vertx.core.MultiMap;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.logging.log4j.LogManager;
@@ -25,15 +26,15 @@ public class AuthorizationHandler {
         return false;
     }
 
-    public static String getUsername(RoutingContext routingContext){
+    public static void authenticateAndLogUser(RoutingContext routingContext) throws AuthenticationException {
         MultiMap params = routingContext.request().params();
         String tokenStr = params.get("token");
         try {
             AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
-            return token.getPreferredUsername();
+            LogManager.getLogger().info("User: "+token.getPreferredUsername()+ " requested Resource " + routingContext.request().path());
         } catch (VerificationException | NullPointerException e) {
             LogManager.getLogger().info("Client has no username associated");
-            return "";
+            throw new AuthenticationException("Client has no username associated");
         }
     }
 

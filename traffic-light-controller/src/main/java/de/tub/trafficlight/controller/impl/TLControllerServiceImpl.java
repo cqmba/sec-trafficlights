@@ -131,13 +131,13 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public boolean changeToGreenOnEVRequest(int tlId, String user) {
+    public boolean changeToGreenOnEVRequest(int tlId) {
         if(getSingleTLState(tlId).isPresent()){
             TrafficLight tl = getSingleTLState(tlId).get();
             if (TLType.VEHICLE.equals(tl.getType())){
-                persistence.addIncident(new TLIncident(tl.getPosition(), user, tl.getId(), TLIncident.STATE.UNRESOLVED));
+                persistence.addIncident(new TLIncident(tl.getPosition(), TLIncident.STATE.UNRESOLVED));
                 this.interrupt = true;
-                logger.debug("New Incident added: " + user + " requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
+                logger.debug("New Incident added: EV requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
                 return true;
             } else {
                 //EV can only request for Vehicle

@@ -1,6 +1,7 @@
 package de.tub.trafficlight.controller;
 
 import de.tub.trafficlight.controller.entity.*;
+import de.tub.trafficlight.controller.exception.AuthenticationException;
 import de.tub.trafficlight.controller.exception.BadRequestException;
 import de.tub.trafficlight.controller.security.AuthorizationHandler;
 import io.vertx.core.AbstractVerticle;
@@ -81,11 +82,10 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetGroup(RoutingContext routingContext){
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
@@ -104,11 +104,10 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPutGroupMode(RoutingContext routingContext){
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "admin"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
@@ -140,13 +139,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
-        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
+        final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
@@ -172,13 +170,12 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiPostSingle(RoutingContext routingContext) {
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
-        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
+        final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
@@ -206,11 +203,10 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetSingle(RoutingContext routingContext) {
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
@@ -233,11 +229,10 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetAll(RoutingContext routingContext) {
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
@@ -252,11 +247,10 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiChangeColor(RoutingContext routingContext){
-        String username = AuthorizationHandler.getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "ev"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
@@ -274,12 +268,12 @@ public class TLControllerVerticle extends AbstractVerticle {
             }
             Set<String> roles = AuthorizationHandler.getRolesFromToken(routingContext.request().params().get("token"));
             if (roles.contains("manager")){
-                logger.debug("TLC-Manager Requested Color Assignment from user " + username);
+                logger.debug("TLC-Manager Requested Color Assignment");
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
                         .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
             } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
-                if (service.changeToGreenOnEVRequest(id, username)){
+                if (service.changeToGreenOnEVRequest(id)){
                     routingContext.response()
                             .putHeader("content-type", "application/json; charset=utf-8")
                             .end(Json.encodePrettily(new JsonObject().put("message", "success")));

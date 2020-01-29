@@ -22,7 +22,7 @@ public interface TLControllerService {
 
     TrafficLight changeToGenericColorOnManagerRequest(int tlId, TLColor color);
 
-    boolean changeToGreenOnEVRequest(int tlId, String user);
+    boolean changeToGreenOnEVRequest(int tlId);
 
     TLMode getGroupMode(int groupId);
 
