@@ -51,9 +51,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
     private final String dbService = "database";
     private final String keycloakService = "keycloak";
 
-    protected ServiceDiscovery discovery;
-    protected CircuitBreaker circuitBreaker;
-    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
+    private ServiceDiscovery discovery;
+    private CircuitBreaker circuitBreaker;
+    private Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     private static final Logger logger = LoggerFactory.getLogger(APIGatewayVerticle.class);
 
@@ -273,13 +273,13 @@ public class APIGatewayVerticle extends AbstractVerticle {
             publish(record);
         }
     }
-    protected void notFound(RoutingContext context) {
+    private void notFound(RoutingContext context) {
         context.response().setStatusCode(404)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("message", "not_found").encodePrettily());
     }
 
-    protected void badGateway(Throwable ex, RoutingContext context) {
+    private void badGateway(Throwable ex, RoutingContext context) {
         ex.printStackTrace();
         context.response()
                 .setStatusCode(502)
@@ -289,7 +289,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
                         .encodePrettily());
     }
 
-    protected Future<Void> publishApiGateway(String host, int port) {
+    private Future<Void> publishApiGateway(String host, int port) {
         Record record = HttpEndpoint.createRecord("api-gateway", true, host, port, "/", null)
                 .setType("api-gateway");
         return publish(record);

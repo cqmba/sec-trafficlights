@@ -36,7 +36,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
     private EVDispatchService service;
     private ServiceDiscovery discovery;
     private String endpoint;
-    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
+    private Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     @Override
     public void start(Promise<Void> promise) throws Exception {
@@ -129,7 +129,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
         });
     }
 
-    protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
+    private Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
         Promise<HttpServer> httpServerPromise = Promise.promise();
         vertx.createHttpServer(options)
                 .requestHandler(router)
@@ -138,7 +138,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
         return httpServerPromise.future().map(r -> null);
     }
 
-    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+    private Future<Void> publishHttpEndpoint(String name, String host, int port) {
         Record record = HttpEndpoint.createRecord(name, host, port, "/",
                 new JsonObject().put("api.name", config().getString("api.name", ""))
         );
