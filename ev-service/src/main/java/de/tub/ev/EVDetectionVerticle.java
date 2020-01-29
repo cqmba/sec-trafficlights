@@ -53,6 +53,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
 
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
+        //these are default values, the real values are loaded from config
         final String keystorepass = config().getString("keystore.password", "password");
         final String keystorepath = config().getString("keystore.path", "ev_keystore.jks");
 

@@ -79,17 +79,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>This is the gateway, please use the API</h1>");
         });
-
-        JsonObject keycloakJson = new JsonObject()
-                .put("realm", "vertx")
-                .put("auth-server-url", "https://localhost:8443/auth")
-                .put("ssl-required", "external")
-                .put("resource", "vertx-tlc2")
-                .put("verify-token-audience", true)
-                .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
-                .put("use-resource-role-mappings", true)
-                .put("confidential-port", 0)
-                .put("policy-enforcer", new JsonObject());
+        JsonObject keycloakJson = config().getJsonObject("keycloak.json");
 
         OAuth2Auth oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);

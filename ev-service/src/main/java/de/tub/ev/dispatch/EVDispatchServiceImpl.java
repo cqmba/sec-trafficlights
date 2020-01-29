@@ -2,7 +2,6 @@ package de.tub.ev.dispatch;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.cli.CLI;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
@@ -20,9 +19,6 @@ import org.apache.logging.log4j.Logger;
 public class EVDispatchServiceImpl implements EVDispatchService {
 
     private static final String BASE_TLC_API = "api/lights/";
-    private static final String TOKEN_PATH = "https://localhost:8443/auth/realms/vertx/protocol/openid-connect/token";
-    private static final String AUTH_CLIENTID = "vertx-test2";
-    private static final String CLIENT_SECRET = "ab4bf0ae-6b51-47e6-ba89-4455c5a0a825";
 
     private static final Logger logger = LogManager.getLogger(EVDispatchServiceImpl.class);
 
@@ -33,10 +29,16 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     private static final boolean MOCKED_SENSOR_RESULT = false;
     private static final int MOCKED_SENSOR_ID = 1;
     private static final int SENSOR_INTERVAL = 1000;
+    private String token_path;
+    private String auth_clientId;
+    private String client_secret;
 
     public EVDispatchServiceImpl(String endpoint, Vertx vertx, JsonObject config) {
         this.endpoint = endpoint;
         this.vertx = vertx;
+        this.token_path = config.getString("token.path");
+        this.auth_clientId = config.getString("auth.clientid");
+        this.client_secret = config.getString("client.secret");
         //the real values are loaded from vertx config, these are default values
         String truststorepath = config.getString("truststore.path", "ev_truststore.jks");
         String truststorepass = config.getString("truststore.pass", "password");
@@ -51,8 +53,8 @@ public class EVDispatchServiceImpl implements EVDispatchService {
                 .setVerifyHost(true);
 
         OAuth2ClientOptions oAuth2ClientOptions = new OAuth2ClientOptions()
-                .setFlow(OAuth2FlowType.CLIENT).setClientID(AUTH_CLIENTID)
-                .setTokenPath(TOKEN_PATH).setClientSecret(CLIENT_SECRET);
+                .setFlow(OAuth2FlowType.CLIENT).setClientID(auth_clientId)
+                .setTokenPath(token_path).setClientSecret(client_secret);
 
         this.oauth2 = OAuth2Auth.create(vertx, oAuth2ClientOptions);
         pullSensorPeriodically();
