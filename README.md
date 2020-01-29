@@ -1,47 +1,44 @@
-Descriptions
-===========
-TODO list
-* Keycloak/Vertx config
-* Create working Docker containers for all services
-* Remove the startup Exceptions if possible
-* Frontend integration
-* Test state machine with frontend for intended behaviour
-* Applications need to be able to verify authorization from oAuth
-* If possible: Create dataprotection service and IDS logic
-* If possible: Refactor for Testing, start writing tests
-* If possible: Encrypt DB communication
-* If possible: Enable Kubernetes Discovery and deploy with Kubernetes
-* **BEFORE RELEASE: Remove all TODOs; handle all Exceptions & Warnings; remove random commented out stuff or development notes; check no passwords get leaked;**
-* **BEFORE RELEASE: Check good code quality, readable, short methods, decoupled, seperation of concerns etc.**
-
 RELEASE notes
 =============
 
-Installation
+Installation Guide
 ============
 * Download
 ```
 git clone https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8.git
 cd wise2019-ivssase-g8
 ```
-* Optionally change the debug passwords
-Production passwords should never be published in version control, therefore the application is only bundled with debug passwords to make testing easier
-If you want to generate new passwords for the Application, you need to change the variables in the `generate_keystore.sh` Skript and run it afterwards. 
-Remember to use different Passwords for Keystores and Truststores
-You have to pass those passwords to vertx as a json, this can be done by editing the respective `conf/config.json` file within the submodules and running the jar with the added argument `-conf conf/config.json` 
-You might need to update the passwords for the docker containers aswell
-
+* For Release we cant provide you with our debug keystores and secrets, therefore you have to create your own certificates first
+* Create Keystores, Truststores with respective Storepasswords for the modules traffic-light-controller, ev-service and api-gateway
+* The API-Gateway Certificate needs to be imported to the EV-Service Truststore and the TLC-Certificate needs to be imported by the API-Gateway Truststore
+* You may use the `generate_keystore.sh` skript, just remember to change the storepass-variables
+* Set the paths (= filenames if in the module directory) and storepasswords in the corresponding `conf/config.json` file
 * Build with maven (you need JDK Version >= 11)
 ```
 mvn clean package
 ```
-* Deploy locally OR build and run as Docker Container
-Deploying locally (repeat in different terminals for ev-service, traffic-light-controller)
-
+* Optionally confirm no bugs are spotted
+```
+mvn spotbugs:spotbugs
+mvn spotbugs:check
+```
+* Run the Vertx Apps locally(JRE >= 11):
+```
+cd traffic-light-controller
+java -jar ./target/traffic-light-controller-fat.jar -conf conf/config.json
+```
+2nd Terminal or run everything in the background
 ```
 cd api-gateway
 java -jar ./target/api-gateway-fat.jar -conf conf/config.json
 ```
+3rd Terminal or run everything in the background
+```
+cd ev-service
+java -jar ./target/ev-service-fat.jar -conf conf/config.json
+```
+
+* Deploy with docker
 
 Deploying with docker (manually)
 ```
@@ -60,13 +57,18 @@ docker run -d -i -t -p 8086:8086 vertx/tlc
 
 OR `docker-compose up`
 * Deploy Keycloak, Database, Frontend (nginx)
+Please follow this Setup And Deployment Guide in the wiki Part of this Gitlab Repo
+https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8/wikis/setup-&-deployment-guide
 
-TODO alles einfach per docker-compose
+* You will need a working Keycloak configuration to be able to access the backend. Therefore make sure to follow the previous step.
+After logging into Keycloak as Admin, confirm 
 
-* Optionally: Deploy with Kubernetes
-
-TODO hier brauchen wir dann die docker commandos von oben vermutlich
-`kompose up` bzw `kompose convert`
+* Deploy with Kubernetes/Minikube
+This is still work in progress, since its not required for the task. 
+We already have a working `docker-compose.yml`, which can be converted to kubernetes with
+`kompose up` or `kompose convert`
+However, in our current setup we have provided static localhost hostnames to our endpoints, therefore our 
+service discovery would have to be ported to kubernetes first, likewise the certificates. We want to revisit this for the next presentation.
 
 Additional Information about the Project
 =============================
@@ -74,8 +76,8 @@ Additional Information about the Project
 Wiki Page for changes during Implementation phase regarding initial planning/requirements
 https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8/wikis/changes-during-implementation
 
-The project was checked with the spotbugs-maven-plugin to contain 0 bugs. 
-run `mvn spotbugs:check` if you want to verify this
+Security Features
+=================
 
 *SSL settings*
 
