@@ -80,7 +80,7 @@ public class EVDispatchServiceImpl implements EVDispatchService {
             } else {
                 User user = res.result();
                 if (user.principal().containsKey("access_token")){
-                    logger.debug("User " + user + "authenticated, Token received: "+ user.principal().getString("access_token"));
+                    logger.debug("User " + user + "authenticated, contains a token");
                     doDispatchToAPI(user, id);
                 } else {
                     logger.info("User has no access token");

@@ -1,4 +1,4 @@
-package de.tub.trafficlight.controller;
+package de.tub.trafficlight.controller.exception;
 
 public class BadRequestException extends Exception {
     public BadRequestException(String message) {
