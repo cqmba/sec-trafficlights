@@ -1,5 +1,7 @@
 package de.tub.apigateway;
 
+import de.tub.apigateway.security.AuthenticationException;
+import de.tub.apigateway.security.AuthenticationHandler;
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.*;
@@ -25,16 +27,14 @@ import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.OAuth2AuthHandler;
-import io.vertx.ext.web.handler.SessionHandler;
-import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
-import org.keycloak.TokenVerifier;
-import org.keycloak.common.VerificationException;
-import org.keycloak.representations.AccessToken;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,12 +47,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
     private static final int DEFAULT_PORT_KC = 8080;
 
     private final String tlcService = "traffic-light-service";
-    private final String gwService = "api-gateway";
     private final String evService = "ev-service";
     private final String dbService = "database";
     private final String keycloakService = "keycloak";
-
-    private OAuth2Auth oauth2;
 
     protected ServiceDiscovery discovery;
     protected CircuitBreaker circuitBreaker;
@@ -63,12 +60,8 @@ public class APIGatewayVerticle extends AbstractVerticle {
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start();
-        //initConfig();
         discovery = ServiceDiscovery.create(vertx);
         initCircuitBreaker();
-        //TODO Kubernetes Discovery
-        //Kubernetes Service Discovery might look like something like this
-        //ServiceDiscovery.create(vertx).registerServiceImporter(new KubernetesServiceImporter(), new JsonObject());
         mockDiscoveryEndpoints();
 
         String host = config().getString("api.gateway.http.address", "localhost");
@@ -77,8 +70,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
         Router router = Router.router(vertx);
         HealthCheckHandler healthHandler = HealthCheckHandler.createWithHealthChecks(HealthChecks.create(vertx));
 
-
-        //enableLocalSession(router);
         router.route().handler(BodyHandler.create());
         router.get("/api/v").handler(this::apiVersion);
 
@@ -88,20 +79,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>This is the gateway, please use the API</h1>");
         });
+        JsonObject keycloakJson = config().getJsonObject("keycloak.json");
 
-
-        JsonObject keycloakJson = new JsonObject()
-                .put("realm", "vertx")
-                .put("auth-server-url", "https://localhost:8443/auth")
-                .put("ssl-required", "external")
-                .put("resource", "vertx-tlc2")
-                .put("verify-token-audience", true)
-                .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
-                .put("use-resource-role-mappings", true)
-                .put("confidential-port", 0)
-                .put("policy-enforcer", new JsonObject());
-
-        oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
+        OAuth2Auth oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
 
         authHandler.setupCallback(router.get("/callback"));
@@ -138,25 +118,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 });
     }
 
-    /*private void initConfig(){
-        ConfigStoreOptions fileStore = new ConfigStoreOptions().setType("file").setConfig(new JsonObject().put("path", "config.json"));
-        ConfigRetrieverOptions configOptions = new ConfigRetrieverOptions().addStore(fileStore);
-        ConfigRetriever retriever = ConfigRetriever.create(vertx, configOptions);
-        retriever.getConfig(ar -> {
-            if (ar.succeeded() && !config().containsKey("keystore.password")){
-                logger.debug("Config successfully loaded");
-                JsonObject result = ar.result();
-                vertx.close();
-                // Create a new Vert.x instance using the retrieve configuration
-                VertxOptions options = new VertxOptions(result);
-                Vertx newVertx = Vertx.vertx(options);
-                newVertx.deployVerticle(APIGatewayVerticle.class.getName());
-            }else {
-                logger.error("Could not load config.");
-            }
-        });
-    }*/
-
     private void initCircuitBreaker(){
         JsonObject cbOptions = config().getJsonObject("circuit-breaker") != null ?
                 config().getJsonObject("circuit-breaker") : new JsonObject();
@@ -171,7 +132,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
         for (String service : Stream.of(tlcService, evService, dbService, keycloakService).collect(Collectors.toList())){
-            //TODO this only checks if discovery has this service, not if this is reachable -> makes only sense with kubernetes
             registerSingleHealthEndpoint(healthHandler, service);
         }
     }
@@ -191,9 +151,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void dispatchRequests(RoutingContext context) {
-        logger.debug("Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
-        if(context.user() != null){
-            logger.info("Request was sent from User "+ context.user());
+        try {
+            AuthenticationHandler.authenticateAndLogRequest(context);
+        } catch (AuthenticationException e) {
+            context.fail(401, e);
         }
         int initialOffset = 5; // length of `/api/`
         circuitBreaker.execute(promise -> getAllEndpoints().setHandler(ar -> {
@@ -237,7 +198,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
         });
     }
 
-    private void doDispatch(RoutingContext context, String path, String endpoint, Promise<Object> promise) {
+    private void doDispatch(RoutingContext routingContext, String path, String endpoint, Promise<Object> promise) {
         String absURI = endpoint+path;
         logger.info("Dispatching request to target service " + absURI);
 
@@ -254,52 +215,19 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setVerifyHost(true);
 
-        Set<String> userRoles = retrieveRoles(context);
-
         WebClient webClient = WebClient.create(vertx, options);
-        HttpRequest<Buffer> request = webClient.requestAbs(context.request().method(), absURI);
-        //TODO make this secure
-        for (String role : userRoles){
-            request.addQueryParam("role", role);
+        HttpRequest<Buffer> request = webClient.requestAbs(routingContext.request().method(), absURI);
+        request.addQueryParam("token", routingContext.user().principal().getString("access_token"));
+        if (routingContext.request().headers().size() >= 1){
+            request.putHeaders(routingContext.request().headers());
         }
-        request.addQueryParam("username", context.user().principal().getString("username"));
-        request.addQueryParam("token", context.user().principal().getString("access_token"));
-        if (context.request().headers().size() >= 1){
-            request.putHeaders(context.request().headers());
+        if (routingContext.user() != null) {
+            request.putHeader("user-principal", routingContext.user().principal().encode());
         }
-        if (context.user() != null) {
-            request.putHeader("user-principal", context.user().principal().encode());
-        }
-        if (context.getBody() == null){
-            request.send(ar -> handleAsyncResult(context, promise, ar));
+        if (routingContext.getBody() == null){
+            request.send(ar -> handleAsyncResult(routingContext, promise, ar));
         } else {
-            request.sendBuffer(context.getBody(), ar -> handleAsyncResult(context, promise, ar));
-        }
-    }
-
-    private Set<String> retrieveRoles(RoutingContext routingContext){
-        logger.debug(routingContext.user().principal());
-        JsonObject userJson = routingContext.user().principal();
-        if (userJson.containsKey("username")){
-            logger.info("User " + routingContext.user() + "authenticated");
-        }
-        if (userJson.containsKey("access_token")){
-            return getRolesFromToken(userJson);
-        } else {
-            logger.debug("Unauthorized Request");
-            return new HashSet<>();
-        }
-    }
-
-    private Set<String> getRolesFromToken(JsonObject principal) {
-        try {
-            String tokenStr = principal.getString("access_token");
-            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
-            Set<String> roles = token.getRealmAccess().getRoles();
-            return roles;
-        } catch (VerificationException | NullPointerException e) {
-            logger.info("Client could not be verified");
-            return new HashSet<>();
+            request.sendBuffer(routingContext.getBody(), ar -> handleAsyncResult(routingContext, promise, ar));
         }
     }
 
@@ -332,13 +260,11 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }
 
     private void mockDiscoveryEndpoints(){
-        //TODO make discovery work
         final boolean ssl = true;
         final String DEFAULT_HOSTNAME = "localhost";
         final String DEFAULT_WEBROOT = "";
 
         Record record1 = HttpEndpoint.createRecord(tlcService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_TLC, DEFAULT_WEBROOT, new JsonObject().put("api.name", "lights").put("api.alt", "groups"));
-        //Record record2 = HttpEndpoint.createRecord(gwService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_GW, DEFAULT_WEBROOT, new JsonObject());
         Record record3 = HttpEndpoint.createRecord(evService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_EV, DEFAULT_WEBROOT, new JsonObject());
         Record record4 = HttpEndpoint.createRecord(dbService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_DB, DEFAULT_WEBROOT, new JsonObject());
         Record record5 = HttpEndpoint.createRecord(keycloakService, ssl, DEFAULT_HOSTNAME, DEFAULT_PORT_KC, DEFAULT_WEBROOT, new JsonObject());
@@ -347,28 +273,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
             publish(record);
         }
     }
-
-    protected void enableLocalSession(Router router) {
-        router.route().handler(SessionHandler.create(
-                LocalSessionStore.create(vertx, "vertx-tlc")));
-    }
-
-    protected void badRequest(RoutingContext context, Throwable ex) {
-        context.response().setStatusCode(400)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
-    }
-
     protected void notFound(RoutingContext context) {
         context.response().setStatusCode(404)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("message", "not_found").encodePrettily());
-    }
-
-    protected void internalError(RoutingContext context, Throwable ex) {
-        context.response().setStatusCode(500)
-                .putHeader("content-type", "application/json")
-                .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
     }
 
     protected void badGateway(Throwable ex, RoutingContext context) {
