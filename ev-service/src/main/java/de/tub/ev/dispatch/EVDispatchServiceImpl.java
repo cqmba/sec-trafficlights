@@ -37,6 +37,7 @@ public class EVDispatchServiceImpl implements EVDispatchService {
     public EVDispatchServiceImpl(String endpoint, Vertx vertx, JsonObject config) {
         this.endpoint = endpoint;
         this.vertx = vertx;
+        //the real values are loaded from vertx config, these are default values
         String truststorepath = config.getString("truststore.path", "ev_truststore.jks");
         String truststorepass = config.getString("truststore.pass", "password");
         this.webClientOptions = new WebClientOptions()
