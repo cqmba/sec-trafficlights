@@ -1,0 +1,28 @@
+{
+  "api.gateway.http.port": 8787,
+  "api.gateway.http.address": "localhost",
+  "circuit-breaker": {
+    "name": "api-gateway-cb",
+    "timeout": 10000,
+    "max-failures": 5
+  },
+  "keystore.password" : "",
+  "keystore.path" : "gateway_keystore.jks",
+  "truststore.path" : "gateway_truststore.jks",
+  "truststore.pass" : "",
+  "keycloak.json" : {
+    "realm" : "vertx",
+    "auth-server-url" : "https://localhost:8443/auth",
+    "ssl-required" : "external",
+    "resource" : "vertx-tlc2",
+    "verify-token-audience" : true,
+    "credentials" : {
+      "secret" : ""
+    },
+    "use-resource-role-mappings" : true,
+    "confidential-port" : 0,
+    "policy-enforcer" : {
+
+    }
+  }
+}

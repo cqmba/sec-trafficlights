@@ -1,0 +1,64 @@
+<h1> Detail View </h1>
+<button mat-button id="back" routerLink="/">Go Back</button>
+<div id="top">
+<mat-card id="schedule">
+  <h2> Schedule </h2>
+  (Comming Soon)
+  <div id="button-pannel">
+    <button mat-button> Reset </button>
+    <button mat-raised-button color="primary"> Apply </button>
+  </div>
+</mat-card>
+<div id="right">
+<mat-card id="overview">
+  <h2> Overview </h2>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Name: </p>
+    <p class="overview_entry_item"> {{tl.position}} </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Group: </p>
+    <p class="overview_entry_item"> {{tl.group}} </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Color: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip [ngStyle]="{backgroundColor: getColorColor(tl.color)}">{{tl.color}}</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Type: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip>{{tl.type}}</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+    <p class="overview_entry_label"> Health: </p>
+    <p class="overview_entry_item">
+      <mat-chip-list>
+        <mat-chip [ngStyle]="{backgroundColor: getColorHealth(tl.health)}"> {{tl.health}}</mat-chip>
+      </mat-chip-list>
+    </p>
+  </div>
+  <div class="overview_entry">
+     <mat-slide-toggle>Maintenance Mode</mat-slide-toggle>
+  </div>
+</mat-card>
+<mat-card id="state_control">
+  <h2>Manual state change</h2>
+  <mat-form-field>
+    <input matInput [(ngModel)]="manualSelectedTimer" placeholder="Please enter a value" />
+  </mat-form-field>
+  <mat-form-field>
+    <mat-select [(value)]="manualSelectedColor" placeholder="Select target State">
+      <mat-option [value]="state" *ngFor="let state of getListByType()">{{state}}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <button mat-raised-button color="primary" id="send" (click)="setTLAssigned()"> Send </button>
+</mat-card>
+</div>
+</div>

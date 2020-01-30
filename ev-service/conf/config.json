@@ -1,0 +1,10 @@
+{
+  "api.name": "ev-service",
+  "keystore.password" : "",
+  "keystore.path" : "ev_keystore.jks",
+  "truststore.path" : "ev_truststore.jks",
+  "truststore.pass" : "",
+  "token.path" : "https://localhost:8443/auth/realms/vertx/protocol/openid-connect/token",
+  "auth.clientid" : "vertx-test2",
+  "client.secret" : ""
+}

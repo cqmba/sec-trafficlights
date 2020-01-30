@@ -12,12 +12,12 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>ev-service</artifactId>
+    <artifactId>traffic-light-controller</artifactId>
     <version>1.0-SNAPSHOT</version>
-
+    <name>tl-controller</name>
 
     <properties>
-        <main.verticle>de.tub.ev.EVDetectionVerticle</main.verticle>
+        <main.verticle>de.tub.trafficlight.controller.TLControllerVerticle</main.verticle>
     </properties>
 
     <build>
@@ -28,6 +28,4 @@
             </plugin>
         </plugins>
     </build>
-
-    
 </project>

@@ -1,0 +1,5 @@
+{
+  "api.name": "traffic-light-service",
+  "keystore.password" : "",
+  "keystore.path" : "tlc_keystore.jks"
+}
