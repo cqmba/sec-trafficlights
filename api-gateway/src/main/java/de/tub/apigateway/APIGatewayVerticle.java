@@ -90,7 +90,9 @@ public class APIGatewayVerticle extends AbstractVerticle {
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(oauth2);
 
         authHandler.setupCallback(router.get("/callback"));
-
+        
+        router.route("/*").handler(this::addHeaders);
+        router.options("/*").handler(this::sendDefaultOptions);
         router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
@@ -127,6 +129,35 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 });
     }
 
+    /*private void initConfig(){
+        ConfigStoreOptions fileStore = new ConfigStoreOptions().setType("file").setConfig(new JsonObject().put("path", "config.json"));
+        ConfigRetrieverOptions configOptions = new ConfigRetrieverOptions().addStore(fileStore);
+        ConfigRetriever retriever = ConfigRetriever.create(vertx, configOptions);
+        retriever.getConfig(ar -> {
+            if (ar.succeeded() && !config().containsKey("keystore.password")){
+                logger.debug("Config successfully loaded");
+                JsonObject result = ar.result();
+                vertx.close();
+                // Create a new Vert.x instance using the retrieve configuration
+                VertxOptions options = new VertxOptions(result);
+                Vertx newVertx = Vertx.vertx(options);
+                newVertx.deployVerticle(APIGatewayVerticle.class.getName());
+            }else {
+                logger.error("Could not load config.");
+            }
+        });
+    }*/
+    
+    private void addHeaders(RoutingContext rc) {
+ 	   rc.response().headers().add("Access-Control-Allow-Origin", "https://localhost");
+ 	   rc.next();
+    }
+    
+    private void sendDefaultOptions(RoutingContext rc) {
+ 	   rc.response().headers().add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PUT")
+ 	   .add("Access-Control-Allow-Headers", "authorization, content-type");
+ 	   rc.response().end();
+    }
     private void initCircuitBreaker(){
         JsonObject cbOptions = config().getJsonObject("circuit-breaker") != null ?
                 config().getJsonObject("circuit-breaker") : new JsonObject();
@@ -255,7 +286,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
             HttpServerResponse toRsp = context.response()
                     .setStatusCode(result.statusCode());
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
-            toRsp.putHeader("Access-Control-Allow-Origin", "http://localhost:4200");
             toRsp.end(result.body());
             promise.tryComplete();
             logger.info("Request successfully handled");
