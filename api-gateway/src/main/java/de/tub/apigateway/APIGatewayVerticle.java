@@ -93,7 +93,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
         JsonObject keycloakJson = new JsonObject()
                 .put("realm", "vertx")
                 .put("auth-server-url", "https://localhost:8443/auth")
-                .put("ssl-required", "external")
+                .put("ssl-required", "all")
                 .put("resource", "vertx-tlc2")
                 .put("verify-token-audience", true)
                 .put("credentials", new JsonObject().put("secret", "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"))
@@ -160,7 +160,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
     }*/
     
     private void addHeaders(RoutingContext rc) {
- 	   rc.response().headers().add("Access-Control-Allow-Origin", "http://localhost:4200");
+ 	   rc.response().headers().add("Access-Control-Allow-Origin", "https://localhost");
  	   rc.next();
     }
     
@@ -322,7 +322,6 @@ public class APIGatewayVerticle extends AbstractVerticle {
                     .setStatusCode(result.statusCode());
             result.headers().forEach(header -> toRsp.putHeader(header.getKey(), header.getValue()));
             toRsp.end(result.body());
-            System.out.println(toRsp.toString());
             promise.tryComplete();
             logger.info("Request successfully handled");
         } else {
