@@ -1,5 +1,6 @@
 /target/
-
+gateway_keystore.jks
+gateway_truststore.jks
 .classpath
 .project
 .settings/

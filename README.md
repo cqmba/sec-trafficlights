@@ -12,7 +12,37 @@ cd wise2019-ivssase-g8
 * Create Keystores, Truststores with respective Storepasswords for the modules traffic-light-controller, ev-service and api-gateway
 * The API-Gateway Certificate needs to be imported to the EV-Service Truststore and the TLC-Certificate needs to be imported by the API-Gateway Truststore
 * You may use the `generate_keystore.sh` skript, just remember to change the storepass-variables
-* Set the paths (= filenames if in the module directory) and storepasswords in the corresponding `conf/config.json` file
+* After completing the previous steps, you should do the following:
+in `api-gateway/` subdirectory, you should have a `gateway_keystore.jks` and `gateway_truststore.jks`
+
+in `api-gateway/conf/config.json` update `keystore.password` value to your keystore password and `truststore.password`to your truststore password
+
+if you have other paths/filenames, update those values aswell
+
+in `traffic-light-controller/` subdirectory, you should have a `tlc_keystore.jks`
+
+in `traffic-light-controller/conf/config.json` update `keystore.password` to your keystore password
+
+if you have other paths/filenames, update those values aswell
+
+in `ev-service/` subdirectory, you should have a `ev_keystore.jks` and `ev_truststore.jks`
+
+in `ev-service/conf/config.json` update `keystore.password` value to your keystore password and `truststore.password`to your truststore password
+
+if you have other paths/filenames, update those values aswell
+
+in `keycloak/` subdirectory, you should have a `keycloak.jks`
+
+in `keycloak/Dockerfile`, you have to update your keycloak path and keycloak keystore password in line 10
+
+* Build Keycloak and log into keycloak to retrieve the client secrets
+
+use your preconfigured keycloak admin credentials (see `docker-compose.yml`) to log in 
+
+go to Clients -> "vertx-tlc2" -> Credentials tab and copy the client secret to `api-gateway/conf/config.json` value credentials : secret : ""
+
+go to Clients -> "vertx-test2" -> Credentials tab and copy the client secret to `ev-service/conf/config.json` value credentials : secret : ""
+
 * Build with maven (you need JDK Version >= 11)
 ```
 mvn clean package
@@ -38,24 +68,23 @@ cd ev-service
 java -jar ./target/ev-service-fat.jar -conf conf/config.json
 ```
 
-* Deploy with docker
+* Deploy with docker (Currently bugged: SSL Error PR_END_OF_FILE_ERROR)
 
 Deploying with docker (manually)
 ```
 cd api-gateway
 docker build . -t vertx/api-gateway
-docker run -d -i -t -p 38080:38080 vertx/api-gateway
+docker run -d -p 8787:8787 vertx/api-gateway
 cd ..
 cd ev-service
 docker build . -t vertx/ev-service
-docker run -d -i -t -p 8087:8087 vertx/ev-service
+docker run -d -p 8087:8087 vertx/ev-service
 cd ..
 cd traffic-light-controller
 docker build . -t vertx/tlc
-docker run -d -i -t -p 8086:8086 vertx/tlc
+docker run -d -p 8086:8086 vertx/tlc
 ```
 
-OR `docker-compose up`
 * Deploy Keycloak, Database, Frontend (nginx)
 Please follow this Setup And Deployment Guide in the wiki Part of this Gitlab Repo
 https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8/wikis/setup-&-deployment-guide
