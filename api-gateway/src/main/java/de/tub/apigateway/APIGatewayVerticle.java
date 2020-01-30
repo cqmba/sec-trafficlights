@@ -1,7 +1,7 @@
 package de.tub.apigateway;
 
 import de.tub.apigateway.security.AuthenticationException;
-import de.tub.apigateway.security.AuthenticationHandler;
+import de.tub.apigateway.security.AuthorizationHandler;
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.*;
@@ -31,10 +31,7 @@ import io.vertx.servicediscovery.Record;
 import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -97,6 +94,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
         router.route("/api/*").handler(authHandler);
         router.route("/api/*").handler(this::dispatchRequests);
 
+        //these are default values, actual secrets are loaded from the config
         final String keystorepass = config().getString("keystore.password", "password");
         final String keystorepath = config().getString("keystore.path", "gateway_keystore.jks");
 
@@ -110,7 +108,10 @@ public class APIGatewayVerticle extends AbstractVerticle {
                 .addEnabledCipherSuite("TLS_AES_128_GCM_SHA256")
                 .setKeyStoreOptions(new JksOptions().setPassword(keystorepass).setPath(keystorepath));
 
+        //register and protect health api
         registerHealthEndpoints(healthHandler);
+        router.route("/health").handler(authHandler);
+        router.route("/health").handler(this::handleIfAdmin);
         router.get("/health").handler(healthHandler);
 
         vertx.createHttpServer(options)
@@ -138,6 +139,15 @@ public class APIGatewayVerticle extends AbstractVerticle {
         );
     }
 
+    private void handleIfAdmin(RoutingContext rc){
+        Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("admin"));
+        if (AuthorizationHandler.isAuthorized(rc, acceptedRoles)){
+            rc.next();
+        } else {
+            rc.fail(403);
+        }
+    }
+
     private void registerHealthEndpoints(HealthCheckHandler healthHandler){
         for (String service : Stream.of(tlcService, evService, dbService, keycloakService).collect(Collectors.toList())){
             registerSingleHealthEndpoint(healthHandler, service);
@@ -160,7 +170,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private void dispatchRequests(RoutingContext context) {
         try {
-            AuthenticationHandler.authenticateAndLogRequest(context);
+            AuthorizationHandler.authenticateAndLogRequest(context);
         } catch (AuthenticationException e) {
             context.fail(401, e);
         }

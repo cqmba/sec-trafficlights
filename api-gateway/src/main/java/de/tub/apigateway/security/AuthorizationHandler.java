@@ -1,5 +1,6 @@
 package de.tub.apigateway.security;
 
+import io.vertx.core.MultiMap;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.logging.log4j.LogManager;
@@ -8,14 +9,15 @@ import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
  * Handler Class that authenticates the Client based on Username and Looks up the Realm Roles by leveraging the access Token
  */
-public class AuthenticationHandler {
+public class AuthorizationHandler {
 
-    private static final Logger logger = LogManager.getLogger(AuthenticationHandler.class);
+    private static final Logger logger = LogManager.getLogger(AuthorizationHandler.class);
 
     /**Authenticates the Request based on the information within the token of the Request and logs identifying information.
      * @param routingContext RoutingContext of the current Request being handled
@@ -44,7 +46,7 @@ public class AuthenticationHandler {
      * @return Set of associated Roles to the User
      * @throws AuthenticationException when the Client has no valid Realm Roles or cannot be verified.
      */
-    private static Set<String> getRolesFromToken(JsonObject principal) throws AuthenticationException{
+    public static Set<String> getRolesFromToken(JsonObject principal) throws AuthenticationException{
         try {
             String tokenStr = principal.getString("access_token");
             AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
@@ -53,6 +55,26 @@ public class AuthenticationHandler {
         } catch (VerificationException | NullPointerException e) {
             logger.info("Client could not be verified");
             throw new AuthenticationException("Client could not be verified");
+        }
+    }
+
+    /**Authorizes the current client by looking up his realm roles and comparing them to a set of accepted roles.
+     * @param routingContext the current RoutingContext.
+     * @param acceptedRoles The Set of accepted Roles.
+     * @return true if the client is authorized to access the resource
+     */
+    public static boolean isAuthorized(RoutingContext routingContext, Set<String> acceptedRoles) {
+        try {
+            Set<String> actualRoles = getRolesFromToken(routingContext.user().principal());
+            for (String role : acceptedRoles){
+                if(actualRoles.contains(role)){
+                    return true;
+                }
+            }
+            logger.info("Client Token does not contain accepted Roles");
+            return false;
+        } catch (AuthenticationException e) {
+            return false;
         }
     }
 }
