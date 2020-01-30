@@ -92,17 +92,26 @@ Configuration (Advanced = strongest) taken from https://owasp.org/www-project-ch
 Vertx does not natively support client Verification for SSL connections, atleast not on the HttpServer Class, only in lower level Classes therefore implementation was not feasible.
 
 **Circuit Breaker for API Gateway**
+
 **extensive, secure Logging (e.g. time, username, roles, source IP & port, accessed resource ...)**
+
 **Service Discovery**
+
 **Role and User based Access Control**
+
 **Token based Authentication and Authorization when accessing Resources**
+
 **Fail-safe Mechanisms and focus on Safety for the Traffic Light Controlling Logic/Scheduling**
+
 **Health Check Service & Lookup**
+
 **User Input Sanitization**
 
 Additional Features
 ==================
 
 **shipped with a MySQL Database and a Frontend**
+
 **basically production ready Backend Implementation**
-**freely configurable Roles & Users through the shipped Keycloak Application**
+
+**freely configurable Roles & Users through the shipped Keycloak Application and simple login flow**
