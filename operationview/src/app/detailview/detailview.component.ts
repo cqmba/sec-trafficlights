@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Input } from '@angular/core';
 import { TrafficLight } from '../model/traffic_light';
 import { Modes, States, Health, Type } from '../model/transition';
 import { OverviewDataService } from '../overview-data.service';
@@ -17,6 +17,9 @@ export class DetailviewComponent implements OnInit {
   stateListP : String[];
   stateListV : String[];
 
+  manualSelectedColor : string;
+  @Input() manualSelectedTimer : number = 0;
+
   constructor(private dataService: OverviewDataService, private route: ActivatedRoute) {
 
     this.dataSub = dataService.getTLList().subscribe(tlList => {
@@ -24,6 +27,14 @@ export class DetailviewComponent implements OnInit {
     });
     this.stateListP = [States.RED, States.GREEN];
     this.stateListV = [States.RED, States.GREEN, States.RED_YELLOW, States.YELLOW, States.YELLOW_BLINK];
+  }
+
+  private setTLAssigned() : void{
+    console.log(this.manualSelectedColor);
+    console.log(this.manualSelectedTimer);
+    var status = this.dataService.setTLAssigned(this.manualSelectedColor, this.manualSelectedTimer, this.tl.id);
+
+    console.log(status);
   }
 
   private getListByType() : String[] {

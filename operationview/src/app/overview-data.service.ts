@@ -91,6 +91,13 @@ export class OverviewDataService {
   };
 }
 
+public setTLAssigned(status : string, time : number, id: number) : number {
+  this.httpClient.put(this.BASE_URL+"/lights/"+id, {"color":status, time:time}).subscribe(resp => {
+     console.log(resp);
+  });;
+  return 500
+}
+
   public update() : void {
     this.httpClient.get<TrafficLight[]>(this.BASE_URL+"/lights").subscribe(list =>{
       this.tlList.next(list);

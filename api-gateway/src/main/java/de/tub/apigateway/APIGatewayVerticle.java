@@ -166,7 +166,7 @@ public class APIGatewayVerticle extends AbstractVerticle {
     
     private void sendDefaultOptions(RoutingContext rc) {
  	   rc.response().headers().add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PUT")
- 	   .add("Access-Control-Allow-Headers", "authorization");
+ 	   .add("Access-Control-Allow-Headers", "authorization, content-type");
  	   rc.response().end();
     }
     private void initCircuitBreaker(){

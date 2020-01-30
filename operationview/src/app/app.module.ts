@@ -21,6 +21,7 @@ import { AppAuthGuard } from './authguard';
 import { APP_INITIALIZER } from '@angular/core';
 import { KeycloakService, KeycloakAngularModule } from 'keycloak-angular';
 import { initializer } from './utils/app-init';
+import { FormsModule } from '@angular/forms';
 
 @NgModule({
   declarations: [
@@ -43,7 +44,8 @@ import { initializer } from './utils/app-init';
     MatFormFieldModule,
     MatSelectModule,
     HttpClientModule,
-    KeycloakAngularModule
+    KeycloakAngularModule,
+    FormsModule
   ],
   providers: [
     AppAuthGuard,

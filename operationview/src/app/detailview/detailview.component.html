@@ -51,14 +51,14 @@
 <mat-card id="state_control">
   <h2>Manual state change</h2>
   <mat-form-field>
-    <input matInput placeholder="Please enter a value" />
+    <input matInput [(ngModel)]="manualSelectedTimer" placeholder="Please enter a value" />
   </mat-form-field>
   <mat-form-field>
-    <mat-select placeholder="Select target State">
-      <mat-option *ngFor="let state of getListByType()">{{state}}</mat-option>
+    <mat-select [(value)]="manualSelectedColor" placeholder="Select target State">
+      <mat-option [value]="state" *ngFor="let state of getListByType()">{{state}}</mat-option>
     </mat-select>
   </mat-form-field>
-  <button mat-raised-button color="primary" id="send"> Send </button>
+  <button mat-raised-button color="primary" id="send" (click)="setTLAssigned()"> Send </button>
 </mat-card>
 </div>
 </div>
