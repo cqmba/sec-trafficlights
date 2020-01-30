@@ -2,6 +2,7 @@ package de.tub.trafficlight.controller.impl;
 
 import de.tub.trafficlight.controller.TLControllerService;
 import de.tub.trafficlight.controller.entity.*;
+import de.tub.trafficlight.controller.logic.IntersectionEmergencyService;
 import de.tub.trafficlight.controller.logic.TLIntersectionLogicService;
 import de.tub.trafficlight.controller.persistence.TLPersistenceService;
 import io.vertx.core.Vertx;
@@ -12,10 +13,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Implements the Controller Service, which handles how the Intersection States are timed and managed.
+ */
 public class TLControllerServiceImpl implements TLControllerService {
 
     private TLPersistenceService persistence;
     private TLIntersectionLogicService intersection;
+    private IntersectionEmergencyService emergency;
     private Vertx vertx;
     private boolean interrupt;
 
@@ -23,23 +28,31 @@ public class TLControllerServiceImpl implements TLControllerService {
 
     private static final Logger logger = LogManager.getLogger(TLControllerServiceImpl.class);
     private static final int MAIN_INTERSECTION_GROUP = 1;
+
+    /**Constructs a new instance and instanciates persistence, emergency and intersection Services
+     * @param vertx The current vertx Instance.
+     */
     public TLControllerServiceImpl(Vertx vertx){
         persistence = TLPersistenceService.getInstance();
-        intersection = TLIntersectionLogicService.getInstance(MAIN_INTERSECTION_GROUP, persistence);
+        emergency = IntersectionEmergencyService.getInstance();
+        intersection = TLIntersectionLogicService.getInstance(MAIN_INTERSECTION_GROUP, persistence, emergency);
         this.vertx = vertx;
         this.interrupt = false;
         counter = 0;
         startSchedule();
     }
 
+    /**
+     * Sets the first Timer and initializes the Intersection, then calls the periodic scheduling
+     */
     private void startSchedule() {
         List<TrafficLight> trafficLights = intersection.getTLList();
         try {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
-                throw new Exception("Error: Failed to initialize Intersection and TL State");
+                throw new RuntimeException("Error: Failed to initialize Intersection and TL State");
             }
             logger.debug("Intersection successfully initialized with state " + intersection.getCurrentIntersectionState());
-        }catch (Exception ex){
+        }catch (RuntimeException ex){
             logger.error(ex.getMessage());
         }
         vertx.setTimer(25000, event -> {
@@ -50,6 +63,11 @@ public class TLControllerServiceImpl implements TLControllerService {
         });
     }
 
+
+    /**Checks periodically, if interrupts need to be handled or the timer is met, then handles it
+     * according to the Intersection Mode.
+     * @param time Time after wich the timed event executes in ms
+     */
     private void timePeriodic(int time){
         counter = 0;
         final int interval = 1000;
@@ -85,6 +103,9 @@ public class TLControllerServiceImpl implements TLControllerService {
         });
     }
 
+    /**
+     * Makes an Intersection Transition, updates the states in the persistence and resets the timer
+     */
     private void executeTransitionAndSetNewTimer(){
         intersection.doTransition();
         persistence.updateTrafficLightList(intersection.getTLList());
@@ -131,13 +152,13 @@ public class TLControllerServiceImpl implements TLControllerService {
     }
 
     @Override
-    public boolean changeToGreenOnEVRequest(int tlId, String user) {
+    public boolean changeToGreenOnEVRequest(int tlId) {
         if(getSingleTLState(tlId).isPresent()){
             TrafficLight tl = getSingleTLState(tlId).get();
             if (TLType.VEHICLE.equals(tl.getType())){
-                persistence.addIncident(new TLIncident(tl.getPosition(), user, tl.getId(), TLIncident.STATE.UNRESOLVED));
+                emergency.addIncident(new TLIncident(tl.getPosition(), TLIncident.STATE.UNRESOLVED));
                 this.interrupt = true;
-                logger.debug("New Incident added: " + user + " requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
+                logger.debug("New Incident added: EV requested GREEN on TL " + tl.getId() + " for Position " + tl.getPosition().toString());
                 return true;
             } else {
                 //EV can only request for Vehicle

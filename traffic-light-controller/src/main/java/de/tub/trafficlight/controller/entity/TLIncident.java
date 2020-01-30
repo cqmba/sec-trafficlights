@@ -1,16 +1,15 @@
 package de.tub.trafficlight.controller.entity;
 
+/**
+ * The Emergency Vehicle Incident, after a Green Light was requested
+ */
 public class TLIncident {
 
     private final TLPosition position;
-    private final String responsibleEntity;
-    private final int tlId;
     private STATE state;
 
-    public TLIncident(TLPosition position, String responsibleEntity, int tlId, STATE state) {
+    public TLIncident(TLPosition position, STATE state) {
         this.position = position;
-        this.responsibleEntity = responsibleEntity;
-        this.tlId = tlId;
         this.state = state;
     }
 

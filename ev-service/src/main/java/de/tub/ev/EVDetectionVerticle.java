@@ -23,6 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * The main Verticle Class with all the REST methods
+ */
 public class EVDetectionVerticle extends AbstractVerticle {
 
     private static final String SERVICE_NAME = "ev-service";
@@ -36,8 +39,12 @@ public class EVDetectionVerticle extends AbstractVerticle {
     private EVDispatchService service;
     private ServiceDiscovery discovery;
     private String endpoint;
-    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
+    private Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
+    /**This is called when the Verticle Instance is deployed.
+     * @param promise A promise which is called when the startup is complete.
+     * @throws Exception
+     */
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start(promise);
@@ -53,6 +60,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
 
         router.get(API_MOCK_SENSOR_DETECT).handler(this::apiRequestOnEVDetection);
 
+        //these are default values, the real values are loaded from config
         final String keystorepass = config().getString("keystore.password", "password");
         final String keystorepath = config().getString("keystore.path", "ev_keystore.jks");
 
@@ -128,7 +136,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
         });
     }
 
-    protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
+    private Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
         Promise<HttpServer> httpServerPromise = Promise.promise();
         vertx.createHttpServer(options)
                 .requestHandler(router)
@@ -137,7 +145,7 @@ public class EVDetectionVerticle extends AbstractVerticle {
         return httpServerPromise.future().map(r -> null);
     }
 
-    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+    private Future<Void> publishHttpEndpoint(String name, String host, int port) {
         Record record = HttpEndpoint.createRecord(name, host, port, "/",
                 new JsonObject().put("api.name", config().getString("api.name", ""))
         );
@@ -166,6 +174,10 @@ public class EVDetectionVerticle extends AbstractVerticle {
         return promise.future();
     }
 
+    /**Stops the verticle when the instance is undeployed and does cleanup.
+     * @param promise A promise that is called when the cleanup is complete.
+     * @throws Exception
+     */
     @Override
     public void stop(Promise<Void> promise) throws Exception {
         List<Promise> promises = new ArrayList<>();

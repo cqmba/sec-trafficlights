@@ -1,7 +1,13 @@
 package de.tub.trafficlight.controller;
 
 import de.tub.trafficlight.controller.entity.*;
-import io.vertx.core.*;
+import de.tub.trafficlight.controller.exception.AuthenticationException;
+import de.tub.trafficlight.controller.exception.BadRequestException;
+import de.tub.trafficlight.controller.security.AuthorizationHandler;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.impl.ConcurrentHashSet;
@@ -16,12 +22,12 @@ import io.vertx.servicediscovery.ServiceDiscovery;
 import io.vertx.servicediscovery.types.HttpEndpoint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.keycloak.TokenVerifier;
-import org.keycloak.common.VerificationException;
-import org.keycloak.representations.AccessToken;
 
 import java.util.*;
 
+/**
+ * The main Verticle Class with all the REST Methods
+ */
 public class TLControllerVerticle extends AbstractVerticle {
 
     private static final String SERVICE_NAME = "traffic-light-service";
@@ -32,14 +38,17 @@ public class TLControllerVerticle extends AbstractVerticle {
 
     private TLControllerService service;
     private ServiceDiscovery discovery;
-    protected Set<Record> registeredRecords = new ConcurrentHashSet<>();
+    private Set<Record> registeredRecords = new ConcurrentHashSet<>();
 
     private static final Logger logger = LogManager.getLogger(TLControllerVerticle.class);
 
+    /**This is called when the Verticle Instance is deployed.
+     * @param promise A promise which is called when the startup is complete.
+     * @throws Exception
+     */
     @Override
     public void start(Promise<Void> promise) throws Exception {
         super.start(promise);
-        //TODO retrieve config
         discovery = ServiceDiscovery.create(vertx);
 
         this.service = TLControllerService.createService(vertx);
@@ -61,9 +70,9 @@ public class TLControllerVerticle extends AbstractVerticle {
         String host = "localhost";
         int port = 8086;
 
-        final String keystorepass = config().getString("keystore.password", "UedJ6AtmjcwF7qNQ");
-        final String keystorepath = config().getString("keystore.path", "src/main/resources/server_keystore.jks");
-        //final String truststorepath = config().getString("truststore.path", "src/main/resources/server_truststore.jks");
+        //default values, the real values need to be parsed through config values
+        final String keystorepass = config().getString("keystore.password", "password");
+        final String keystorepath = config().getString("keystore.path", "tlc_keystore.jks");
 
         HttpServerOptions options = new HttpServerOptions()
                 .setSsl(true)
@@ -80,44 +89,35 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiGetGroup(RoutingContext routingContext){
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String grId = routingContext.request().getParam("grId");
-        int groupId;
-        try {
-            groupId = Integer.parseInt(grId);
-        } catch (NumberFormatException e) {
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
+        try{
+            int groupId = retrieveGroupId(routingContext);
+            TLMode mode = service.getGroupMode(groupId);
+            routingContext.response()
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(new JsonObject().put("mode", mode.toString())));
+        } catch (BadRequestException ex){
+            badRequest(routingContext, ex);
         }
-        if (groupId > 2){
-            badRequest(routingContext, new Exception("Group ID can only be 1 or 2"));
-        }
-        TLMode mode = service.getGroupMode(groupId);
-        routingContext.response()
-                .putHeader("content-type", "application/json; charset=utf-8")
-                .end(Json.encodePrettily(new JsonObject().put("mode", mode.toString())));
     }
 
     private void apiPutGroupMode(RoutingContext routingContext){
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "admin"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
@@ -146,215 +146,202 @@ public class TLControllerVerticle extends AbstractVerticle {
     }
 
     private void apiDeleteSingle(RoutingContext routingContext) {
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
-        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String tlId = routingContext.request().getParam("tlId");
-        int id;
         try {
-            id = Integer.parseInt(tlId);
-        } catch (NumberFormatException e) {
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
-        }
-        if(service.getSingleTLState(id).isPresent() && service.getSingleTLState(id).get().getGroup() == 2){
-            if (service.removeTL(id)) {
-                logger.info("Traffic Light deleted " + id);
-                routingContext.response().setStatusCode(204).end();
+            int id = retrieveTLId(routingContext);
+            if(service.getSingleTLState(id).isPresent() && service.getSingleTLState(id).get().getGroup() == 2){
+                if (service.removeTL(id)) {
+                    logger.info("Traffic Light deleted " + id);
+                    routingContext.response().setStatusCode(204).end();
+                } else {
+                    logger.error("Unable to delete Traffic Light");
+                    internalError(routingContext, new Exception("Unable to delete Traffic Light"));
+                }
             } else {
-                logger.error("Unable to delete Traffic Light");
-                internalError(routingContext, new Exception("Unable to delete Traffic Light"));
+                logger.debug("Intersection 1 Traffic Light cannot be deleted");
+                badRequest(routingContext, new Exception("Intersection 1 Traffic Light cannot be deleted"));
             }
-        } else {
-            logger.debug("Intersection 1 Traffic Light cannot be deleted");
-            badRequest(routingContext, new Exception("Intersection 1 Traffic Light cannot be deleted"));
+        } catch (BadRequestException ex){
+            badRequest(routingContext, ex);
         }
 
     }
 
     private void apiPostSingle(RoutingContext routingContext) {
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
-        final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String tlId = routingContext.request().getParam("tlId");
-        JsonObject json = routingContext.getBodyAsJson();
-        TLPosition position = getEnumFromString(TLPosition.class, json.getString("position", TLPosition.UNSPECIFIED.toString()));
-        TLType type = getEnumFromString(TLType.class, json.getString("type", "VEHICLE"));
-        TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
-        if (color == null || type == null || position == null){
-            logger.debug("Type, Position or Color not passed correctly");
-            badRequest(routingContext, new Exception("Type, Position or Color not passed correctly"));
-            return;
-        }
-        int group = json.getInteger("group");
-        int id;
         try {
-            id = Integer.parseInt(tlId);
-        } catch (Exception ex){
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
+            int group = routingContext.getBodyAsJson().getInteger("group");
+            int id = retrieveTLId(routingContext);
+            TLColor color = retrieveTLColor(routingContext);
+            TLPosition position = retrieveTLPosition(routingContext);
+            TLType type = retrieveTLType(routingContext);
+            if (service.getSingleTLState(id).isPresent() || group == 1){
+                logger.debug("Traffic Light with given ID already exits or group ID is bad");
+                badRequest(routingContext, new BadRequestException("Traffic Light with given ID already exits or group ID is bad"));
+                return;
+            }
+            TrafficLight created = service.addTL(id, color, position, type);
+            logger.debug("New traffic light created " + created.getId());
+            routingContext.response()
+                    .setStatusCode(201)
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(created));
+        }catch (BadRequestException ex){
+            badRequest(routingContext, ex);
         }
-        if (service.getSingleTLState(id).isPresent() || group == 1){
-            logger.debug("Traffic Light with given ID already exits or group ID is bad");
-            badRequest(routingContext, new Exception("Traffic Light with given ID already exits or group ID is bad"));
-            return;
-        }
-        TrafficLight created = service.addTL(id, color, position, type);
-        logger.debug("New traffic light created " + created.getId());
-        routingContext.response()
-                .setStatusCode(201)
-                .putHeader("content-type", "application/json; charset=utf-8")
-                .end(Json.encodePrettily(created));
     }
 
     private void apiGetSingle(RoutingContext routingContext) {
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String tlId = routingContext.request().getParam("tlId");
-        int id;
         try {
-            id = Integer.parseInt(tlId);
-        } catch (Exception ex){
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
+            int id = retrieveTLId(routingContext);
+            if (service.getSingleTLState(id).isEmpty()){
+                logger.debug("Traffic Light for given ID could not be found");
+                notFound(routingContext);
+                return;
+            }
+            routingContext.response()
+                    .putHeader("content-type", "application/json; charset=utf-8")
+                    .end(Json.encodePrettily(service.getSingleTLState(id).get()));
+        } catch (BadRequestException ex){
+            badRequest(routingContext, ex);
         }
-        if (service.getSingleTLState(id).isEmpty()){
-            logger.debug("Traffic Light for given ID could not be found");
-            notFound(routingContext);
-            return;
-        }
-        routingContext.response()
-                .putHeader("content-type", "application/json; charset=utf-8")
-                .end(Json.encodePrettily(service.getSingleTLState(id).get()));
     }
 
     private void apiGetAll(RoutingContext routingContext) {
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        try {
-            List<TrafficLight> tlList = service.getTLList();
-            routingContext.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .putHeader("Access-Control-Allow-Origin", "*")
-                    .end(Json.encodePrettily(tlList));
-        } catch (Exception ex){
-            internalError(routingContext, new Exception("Unable to Retrieve the traffic lights"));
-        }
+        List<TrafficLight> tlList = service.getTLList();
+        routingContext.response()
+                .putHeader("content-type", "application/json; charset=utf-8")
+                .putHeader("Access-Control-Allow-Origin", "*")
+                .end(Json.encodePrettily(tlList));
     }
 
     private void apiChangeColor(RoutingContext routingContext){
-        String username = getUsername(routingContext);
-        if (username.isEmpty()){
-            routingContext.fail(401);
-        } else {
-            logger.info("User: "+username+ "requested Resource");
+        try {
+            AuthorizationHandler.authenticateAndLogUser(routingContext);
+        } catch (AuthenticationException e){
+            routingContext.fail(401, e);
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "ev"));
-        if(!isAuthorized(routingContext, acceptedRoles)){
+        if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
         }
-        String tlId = routingContext.request().getParam("tlId");
-        JsonObject json = routingContext.getBodyAsJson();
-        TLColor color = getEnumFromString(TLColor.class, json.getString("color", "GREEN"));
-        if (color == null){
-            logger.debug("Color not matching possible options");
-            badRequest(routingContext, new Exception("Color not matching possible options"));
-            return;
-        }
-        int group = json.getInteger("group");
-        int id;
         try {
-            id = Integer.parseInt(tlId);
-        } catch (Exception ex){
-            logger.debug("ID could not be parsed to int");
-            badRequest(routingContext, new Exception("ID could not be parsed to int"));
-            return;
-        }
-        if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
-            logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
-            badRequest(routingContext, new Exception("Traffic Light ID doesnt exist or Group ID is wrong"));
-            return;
-        }
-        Set<String> roles = getRolesFromToken(routingContext.request().params().get("token"));
-        if (roles.contains("manager")){
-            logger.debug("TLC-Manager Requested Color Assignment from user " + username);
-            routingContext.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
-        } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
-            if (service.changeToGreenOnEVRequest(id, username)){
+            int group = routingContext.getBodyAsJson().getInteger("group");
+            int id = retrieveTLId(routingContext);
+            TLColor color = retrieveTLColor(routingContext);
+            if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
+                logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
+                badRequest(routingContext, new BadRequestException("Traffic Light ID doesnt exist or Group ID is wrong"));
+                return;
+            }
+            Set<String> roles = AuthorizationHandler.getRolesFromToken(routingContext.request().params().get("token"));
+            if (roles.contains("manager")){
+                logger.debug("TLC-Manager Requested Color Assignment");
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
-                        .end(Json.encodePrettily(new JsonObject().put("message", "success")));
+                        .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
+            } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
+                if (service.changeToGreenOnEVRequest(id)){
+                    routingContext.response()
+                            .putHeader("content-type", "application/json; charset=utf-8")
+                            .end(Json.encodePrettily(new JsonObject().put("message", "success")));
+                } else {
+                    logger.debug("Couldnt execute green Light change.");
+                    internalError(routingContext, new RuntimeException("Unable to switch to green light"));
+                }
             } else {
-                logger.debug("Couldnt execute green Light change.");
-                internalError(routingContext, new Exception("Unable to switch to green light"));
+                routingContext.fail(403);
             }
-        } else {
-            routingContext.fail(403);
-        }
+         } catch (BadRequestException ex){
+             badRequest(routingContext, ex);
+         }
     }
 
-    private boolean isAuthorized(RoutingContext routingContext, Set<String> acceptedRoles) {
-        MultiMap params = routingContext.request().params();
-        String token = params.get("token");
-        Set<String> actualRoles = getRolesFromToken(token);
-        for (String role : acceptedRoles){
-            if(actualRoles.contains(role)){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String getUsername(RoutingContext routingContext){
-        MultiMap params = routingContext.request().params();
-        String tokenStr = params.get("token");
+    private int retrieveGroupId(RoutingContext routingContext) throws BadRequestException{
+        String grId = routingContext.request().getParam("grId");
         try {
-            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
-            return token.getPreferredUsername();
-        } catch (VerificationException | NullPointerException e) {
-            logger.info("Client has no username associated");
-            return "";
+            int groupId = Integer.parseInt(grId);
+            //only groups 1 and 2 accepted
+            if (groupId == 1 || groupId == 2){
+                return groupId;
+            }
+        } catch (NumberFormatException e) {
+            logger.debug("GroupId is invalid");
         }
+        throw new BadRequestException("GroupId is invalid");
+    }
+
+    private int retrieveTLId(RoutingContext routingContext) throws BadRequestException {
+        String tlId = routingContext.request().getParam("tlId");
+        try {
+            return Integer.parseInt(tlId);
+        } catch (NumberFormatException ex){
+            logger.debug("ID could not be parsed to int");
+            throw new BadRequestException("ID could not be parsed to int");
+        }
+    }
+
+    private TLColor retrieveTLColor(RoutingContext routingContext) throws BadRequestException{
+        TLColor color = getEnumFromString(TLColor.class, routingContext.getBodyAsJson().getString("color", "GREEN"));
+        if (color == null){
+            logger.debug("Color not matching possible options");
+            throw new BadRequestException("Color not matching possible options");
+        } else return color;
+    }
+
+    private TLPosition retrieveTLPosition(RoutingContext routingContext) throws BadRequestException{
+        TLPosition position = getEnumFromString(TLPosition.class, routingContext.getBodyAsJson().getString("position", TLPosition.UNSPECIFIED.toString()));
+        if (position == null){
+            logger.debug("Position not matching possible options");
+            throw new BadRequestException("Position not matching possible options");
+        } else return position;
+    }
+
+    private TLType retrieveTLType(RoutingContext routingContext) throws BadRequestException{
+        TLType type = getEnumFromString(TLType.class, routingContext.getBodyAsJson().getString("type", TLType.VEHICLE.toString()));
+        if (type == null){
+            logger.debug("Type not matching possible options");
+            throw new BadRequestException("Type not matching possible options");
+        } else return type;
     }
 
     private static <T extends Enum<T>> T getEnumFromString(Class<T> c, String string) {
@@ -368,18 +355,7 @@ public class TLControllerVerticle extends AbstractVerticle {
         return null;
     }
 
-    private Set<String> getRolesFromToken(String tokenStr) {
-        try {
-            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
-            Set<String> roles = token.getRealmAccess().getRoles();
-            return roles;
-        } catch (VerificationException | NullPointerException e) {
-            logger.info("Client could not be verified");
-            return new HashSet<>();
-        }
-    }
-
-    protected Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
+    private Future<HttpServer> createHttpServer(Router router, String host, int port, HttpServerOptions options) {
         Promise<HttpServer> httpServerPromise = Promise.promise();
         vertx.createHttpServer(options)
                 .requestHandler(router)
@@ -388,25 +364,25 @@ public class TLControllerVerticle extends AbstractVerticle {
         return httpServerPromise.future().map(r -> null);
     }
 
-    protected void badRequest(RoutingContext context, Throwable ex) {
+    private void badRequest(RoutingContext context, Throwable ex) {
         context.response().setStatusCode(400)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
     }
 
-    protected void notFound(RoutingContext context) {
+    private void notFound(RoutingContext context) {
         context.response().setStatusCode(404)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("message", "not_found").encodePrettily());
     }
 
-    protected void internalError(RoutingContext context, Throwable ex) {
+    private void internalError(RoutingContext context, Throwable ex) {
         context.response().setStatusCode(500)
                 .putHeader("content-type", "application/json")
                 .end(new JsonObject().put("error", ex.getMessage()).encodePrettily());
     }
 
-    protected Future<Void> publishHttpEndpoint(String name, String host, int port) {
+    private Future<Void> publishHttpEndpoint(String name, String host, int port) {
         Record record = HttpEndpoint.createRecord(name, host, port, "/",
                 new JsonObject().put("api.name", config().getString("api.name", ""))
         );
@@ -435,6 +411,10 @@ public class TLControllerVerticle extends AbstractVerticle {
         return promise.future();
     }
 
+    /**Stops the verticle when the instance is undeployed and does cleanup.
+     * @param promise A promise that is called when the cleanup is complete.
+     * @throws Exception
+     */
     @Override
     public void stop(Promise<Void> promise) {
         List<Promise> promises = new ArrayList<>();

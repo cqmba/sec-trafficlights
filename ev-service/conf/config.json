@@ -3,5 +3,8 @@
   "keystore.password" : "2E63KpCw89yXuVqS",
   "keystore.path" : "ev_keystore.jks",
   "truststore.path" : "ev_truststore.jks",
-  "truststore.pass" : "2E63KpCw89yXuVqS"
+  "truststore.pass" : "2E63KpCw89yXuVqS",
+  "token.path" : "https://localhost:8443/auth/realms/vertx/protocol/openid-connect/token",
+  "auth.clientid" : "vertx-test2",
+  "client.secret" : "ab4bf0ae-6b51-47e6-ba89-4455c5a0a825"
 }

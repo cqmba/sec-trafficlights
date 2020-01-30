@@ -17,5 +17,20 @@
   "keystore.password" : "4mB8nqJd5YEHFkw6",
   "keystore.path" : "gateway_keystore.jks",
   "truststore.path" : "gateway_truststore.jks",
-  "truststore.pass" : "4mB8nqJd5YEHFkw6"
+  "truststore.pass" : "4mB8nqJd5YEHFkw6",
+  "keycloak.json" : {
+    "realm" : "vertx",
+    "auth-server-url" : "https://localhost:8443/auth",
+    "ssl-required" : "external",
+    "resource" : "vertx-tlc2",
+    "verify-token-audience" : true,
+    "credentials" : {
+      "secret" : "682d858d-0875-4ff2-93b3-bcd6af4c5b1d"
+    },
+    "use-resource-role-mappings" : true,
+    "confidential-port" : 0,
+    "policy-enforcer" : {
+
+    }
+  }
 }

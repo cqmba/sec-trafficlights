@@ -1,5 +1,8 @@
 package de.tub.trafficlight.controller.entity;
 
+/**
+ * The State of an Intersection that implements the State Machine of the requirement/planning phase.
+ */
 public enum TLState {
 
     //State Machine changed regarding requirements!
@@ -317,10 +320,35 @@ public enum TLState {
         }
     };
 
+    /**Returns the next State after a transition
+     * @param isEmergencyMain true if an Emergency Vehicle is detected on the MainRoad
+     * @param isEmergencySide true if an Emergency Vehicle is detected on the MainRoad
+     * @return
+     */
     public abstract TLState nextState(boolean isEmergencyMain, boolean isEmergencySide);
+
+    /**
+     * @return the current Color of the MainRoad TrafficLights
+     */
     public abstract TLColor getCurrentMainRoadColor();
+
+    /**
+     * @return The current Color of the SideRoad TrafficLights
+     */
     public abstract TLColor getCurrentSideRoadColor();
+
+    /**
+     * @return The current Color of the MainRoad Pedestrian Lights
+     */
     public abstract TLColor getCurrentMainPedestrianColor();
+
+    /**
+     * @return The current Color of the SideRoad Pedestrian Lights
+     */
     public abstract TLColor getCurrentSidePedestrianColor();
+
+    /**
+     * @return The current Transition Time in ms until the next State
+     */
     public abstract int getCurrentStandardTransitionTimeMs();
 }

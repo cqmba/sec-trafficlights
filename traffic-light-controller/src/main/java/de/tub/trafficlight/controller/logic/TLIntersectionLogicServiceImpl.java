@@ -12,6 +12,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Implements the Intersection Service, which allows modelling an Intersection, changing its state and mode, and retrieving its TrafficLights
+ */
 public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicService{
 
     private static final Logger logger = LogManager.getLogger(TLIntersectionLogicServiceImpl.class);
@@ -26,9 +29,16 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
 
     private Optional<TLIncident> optional;
     private TLPersistenceService persistence;
+    private IntersectionEmergencyService emergencyService;
 
-    public TLIntersectionLogicServiceImpl(int groupId, TLPersistenceService persistence){
+    /**Constructs an Intersection with a set of given TrafficLights.
+     * @param groupId the GroupId of the Intersection
+     * @param persistence The current Persistence Service
+     * @param emergencyService THe current Emergency Service
+     */
+    public TLIntersectionLogicServiceImpl(int groupId, TLPersistenceService persistence, IntersectionEmergencyService emergencyService){
         this.persistence = persistence;
+        this.emergencyService = emergencyService;
         this.state = TLState.S0_MG_SR_PM;
         this.groupId = groupId;
         this.mode = TLMode.SCHEDULED;
@@ -111,17 +121,17 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     private void updateIncidents() {
         //if past incident got green now it is resolved
         if (state.equals(TLState.S3_MR_SG_PS)){
-            persistence.resolveSideRoadIncidents();
-            optional = persistence.updateIncident(optional, false, true);
+            emergencyService.resolveSideRoadIncidents();
+            optional = emergencyService.updateIncident(optional, false, true);
             logger.debug("Side Road incidents have been handled.");
         } else if(state.equals(TLState.S0_MG_SR_PM)){
-            persistence.resolveMainRoadIncidents();
-            optional = persistence.updateIncident(optional, true, false);
+            emergencyService.resolveMainRoadIncidents();
+            optional = emergencyService.updateIncident(optional, true, false);
             logger.debug("Main Road incidents have been handled.");
         }
         //load new incident if necessary
         if (optional.isEmpty()){
-            optional = persistence.getNextUnresolvedIncident();
+            optional = emergencyService.getNextUnresolvedIncident();
         }
     }
 
