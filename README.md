@@ -35,9 +35,19 @@ in `keycloak/` subdirectory, you should have a `keycloak.jks`
 
 in `keycloak/Dockerfile`, you have to update your keycloak path and keycloak keystore password in line 10
 
-* Build Keycloak and log into keycloak to retrieve the client secrets
+in `operationview/docker-conf/` supply a `ca.cert` and a `ca.key`file
 
-use your preconfigured keycloak admin credentials (see `docker-compose.yml`) to log in 
+* Deploy Keycloak, Database, Frontend (nginx)
+
+Currently, it is only possible to start a valid Keycloak configuration for the application if you fill the MySQL Database with an initial SQL-Dump file.
+Please follow this Setup And Deployment Guide in the wiki Part of this Gitlab Repo
+https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8/wikis/setup-&-deployment-guide
+
+`docker-compose up` should now deploy Keycloak, the MySQL Database and the Frontend running on nginx correctly (Building the frontend takes a while)
+
+* Start Keycloak and log into keycloak to retrieve the client secrets
+
+Go to `https://localhost:8443/` and log into the master console by using your preconfigured keycloak admin credentials (see `docker-compose.yml`) to log in 
 
 go to Clients -> "vertx-tlc2" -> Credentials tab and copy the client secret to `api-gateway/conf/config.json` value credentials : secret : ""
 
@@ -68,7 +78,10 @@ cd ev-service
 java -jar ./target/ev-service-fat.jar -conf conf/config.json
 ```
 
-* Deploy with docker (Currently bugged: SSL Error PR_END_OF_FILE_ERROR)
+* Alternatively, deploy vertx apps with docker 
+Somehow this is currently bugged: SSL Error PR_END_OF_FILE_ERROR
+
+TLS is working fine when deployed as fat jar though, so far we have not found a solution. For building a vertx docker from a fat jar, we kept to the official vertx Examples on vertx.io
 
 Deploying with docker (manually)
 ```
@@ -85,12 +98,7 @@ docker build . -t vertx/tlc
 docker run -d -p 8086:8086 vertx/tlc
 ```
 
-* Deploy Keycloak, Database, Frontend (nginx)
-Please follow this Setup And Deployment Guide in the wiki Part of this Gitlab Repo
-https://gitlab.tubit.tu-berlin.de/aot-security-lectures/wise2019-ivssase-g8/wikis/setup-&-deployment-guide
-
-* You will need a working Keycloak configuration to be able to access the backend. Therefore make sure to follow the previous step.
-After logging into Keycloak as Admin, confirm 
+* If everything is running and the jars are started with the correct config file, you should be able to access the frontend at `https://localhost` or the api-gateway directly at `https://localhost:8787/api/lights`. Make sure to login with a valid user and an authorized Role Mapping, i.e. `manager`or `observer`. The `ev-service` can be triggered manually by calling `https://localhost:8087/sensors/id:` with an id value between 0-3 
 
 * Deploy with Kubernetes/Minikube
 This is still work in progress, since its not required for the task. 

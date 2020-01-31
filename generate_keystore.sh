@@ -48,10 +48,10 @@ echo "Exporting selfsigned Frontend Certificate"
 keytool -export -alias $ALIAS_FRONTEND -storepass $FRONTEND_STOREPASS -rfc -file ${NAME_FRONTEND}.pem -keystore ${NAME_FRONTEND}_keystore.jks
 
 echo "Generating Keycloak Keystore/Keypair"
-keytool -genkeypair -alias $ALIAS_KEYCLOAK -keyalg RSA -keystore ${NAME_KEYCLOAK}_keystore.jks -keysize 2048 -dname $DOMAIN_KEYCLOAK -storepass $KEYCLOAK_STOREPASS -validity 360
+keytool -genkeypair -alias $ALIAS_KEYCLOAK -keyalg RSA -keystore ${NAME_KEYCLOAK}.jks -keysize 2048 -dname $DOMAIN_KEYCLOAK -storepass $KEYCLOAK_STOREPASS -validity 360
 
 echo "Exporting selfsigned Keycloak Certificate"
-keytool -export -alias $ALIAS_KEYCLOAK -storepass $KEYCLOAK_STOREPASS -rfc -file ${NAME_KEYCLOAK}.pem -keystore ${NAME_KEYCLOAK}_keystore.jks
+keytool -export -alias $ALIAS_KEYCLOAK -storepass $KEYCLOAK_STOREPASS -rfc -file ${NAME_KEYCLOAK}.pem -keystore ${NAME_KEYCLOAK}.jks
 
 
 #echo "Importing TLC,EV,FRONTEND certificate into gateway truststore"
