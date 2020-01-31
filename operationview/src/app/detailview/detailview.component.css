@@ -1,0 +1,101 @@
+h1{
+  text-align: center;
+}
+
+div{
+  display: flex;
+}
+
+mat-card{
+  display: flex;
+}
+
+mat-form-field{
+  width: 200px;
+}
+
+#back{
+  position: relative;
+  left: 36px;
+}
+
+#top{
+  display: flex;
+  flex-direction: row;
+  padding-left: 25px;
+  padding-right: 25px;
+  align-items: flex-start;
+}
+
+#schedule{
+  display: flex;
+  position: relative;
+  left: 20px;
+  margin-right: 50px;
+  flex-direction: column;
+  flex-grow: 3;
+}
+
+#right{
+  margin-right: 20px;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+#overview{
+  padding-bottom: 30px;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+#state_control{
+  flex-direction: column;
+  position: relative;
+  margin-top: 20px;
+  flex-grow: 1;
+}
+.overview_entry{
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-grow: 1;
+  margin: 10px;
+}
+
+.overview_entry_label{
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+  flex-basis: 100px;
+  margin: 4px 4px 4px 4px;
+}
+
+.overview_entry_item{
+  display: flex;
+  flex-direction: row;
+  flex-grow: 3;
+  margin: 4px 4px 4px 4px;
+}
+
+.schedule_entry{
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: flex-start;
+  flex-grow: 1;
+  margin: 10px;
+}
+
+.schedule_input{
+  flex-basis: 400px;
+}
+
+.schedule_item{
+  flex-basis: 200px;
+}
+
+#button-pannel{
+  justify-content: flex-end;
+  align-self: flex-end;
+  position: relative;
+  flex-direction: row;
+}
