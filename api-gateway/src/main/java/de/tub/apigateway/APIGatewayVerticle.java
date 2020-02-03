@@ -172,7 +172,8 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private void handleIfAdmin(RoutingContext rc){
         Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("admin"));
-        if (AuthorizationHandler.isAuthorized(rc, acceptedRoles)){
+        logger.info("Source IP " + rc.request().remoteAddress() +" requests resource " +rc.request().absoluteURI());
+        if (AuthorizationHandler.isAuthorized(rc.user().principal(), acceptedRoles)){
             rc.next();
         } else {
             rc.fail(403);
@@ -201,7 +202,8 @@ public class APIGatewayVerticle extends AbstractVerticle {
 
     private void dispatchRequests(RoutingContext context) {
         try {
-            AuthorizationHandler.authenticateAndLogRequest(context);
+            logger.info("Source IP " + context.request().remoteAddress() +" requests resource " +context.request().absoluteURI());
+            AuthorizationHandler.authenticateAndLogRequest(context.user().principal());
         } catch (AuthenticationException e) {
             context.fail(401, e);
         }
