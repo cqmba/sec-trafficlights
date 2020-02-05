@@ -103,8 +103,7 @@ public class TLControllerServiceImpl implements TLControllerService {
      * Makes an Intersection Transition, updates the states in the persistence and resets the timer
      */
     private void executeTransitionAndSetNewTimer(){
-        intersection.doTransition();
-        persistence.updateTrafficLightList(intersection.getTLList());
+        doTransition();
         int transitionMs = intersection.getNextTransitionTimeMs();
         logger.debug("Waiting for "+ transitionMs + "ms");
         timePeriodic(transitionMs);
@@ -190,5 +189,15 @@ public class TLControllerServiceImpl implements TLControllerService {
         }else {
             return persistence.switchModeOfFreeTLs(newMode);
         }
+    }
+
+    protected void resetIntersectionState() {
+        intersection.resetIntersectionState();
+        interrupt = true;
+    }
+
+    protected void doTransition(){
+        intersection.doTransition();
+        persistence.updateTrafficLightList(intersection.getTLList());
     }
 }
