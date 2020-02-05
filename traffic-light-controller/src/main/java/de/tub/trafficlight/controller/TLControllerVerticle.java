@@ -282,7 +282,6 @@ public class TLControllerVerticle extends AbstractVerticle {
             int group = routingContext.getBodyAsJson().getInteger("group");
             int id = retrieveTLId(routingContext);
             TLColor color = retrieveTLColor(routingContext);
-            logger.info(Json.encodePrettily(service.getTLList()));
             if (service.getSingleTLState(id).isEmpty() || service.getSingleTLState(id).get().getGroup() != group){
                 logger.debug("Traffic Light ID doesnt exist or Group ID is wrong");
                 badRequest(routingContext, new BadRequestException("Traffic Light ID doesnt exist or Group ID is wrong"));
