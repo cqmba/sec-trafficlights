@@ -107,6 +107,11 @@ public class TLPersistenceServiceImpl implements TLPersistenceService {
         return freeTLMode;
     }
 
+    @Override
+    public void deletePreviousEntries() {
+        tlRepo.clear();
+    }
+
     private TrafficLight addIntersectionTrafficLight(TrafficLight tl){
         tlRepo.put(tl.getId(), tl);
         return tl;

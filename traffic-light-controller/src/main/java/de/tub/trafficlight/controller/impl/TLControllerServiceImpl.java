@@ -46,6 +46,7 @@ public class TLControllerServiceImpl implements TLControllerService {
      * Sets the first Timer and initializes the Intersection, then calls the periodic scheduling
      */
     private void startSchedule() {
+        persistence.deletePreviousEntries();
         List<TrafficLight> trafficLights = intersection.getTLList();
         try {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
@@ -55,12 +56,7 @@ public class TLControllerServiceImpl implements TLControllerService {
         }catch (RuntimeException ex){
             logger.error(ex.getMessage());
         }
-        vertx.setTimer(25000, event -> {
-            intersection.doTransition();
-            persistence.updateTrafficLightList(intersection.getTLList());
-            logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
-            timePeriodic(intersection.getNextTransitionTimeMs());
-        });
+        timePeriodic(25000);
     }
 
 
