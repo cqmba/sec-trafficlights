@@ -161,4 +161,9 @@ public class TLIntersectionLogicServiceImpl implements TLIntersectionLogicServic
     public TLState getCurrentIntersectionState(){
         return state;
     }
+
+    @Override
+    public void resetIntersectionState() {
+        this.state = TLState.S0_MG_SR_PM;
+    }
 }

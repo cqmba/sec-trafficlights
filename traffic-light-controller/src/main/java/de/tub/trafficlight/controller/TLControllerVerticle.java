@@ -4,6 +4,7 @@ import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.exception.AuthenticationException;
 import de.tub.trafficlight.controller.exception.BadRequestException;
 import de.tub.trafficlight.controller.security.AuthorizationHandler;
+import de.tub.trafficlight.controller.security.IntrusionDetectionHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
@@ -93,11 +94,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         try{
             int groupId = retrieveGroupId(routingContext);
@@ -115,11 +118,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "admin"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         String grId = routingContext.request().getParam("grId");
         int groupId;
@@ -150,11 +155,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         try {
             int id = retrieveTLId(routingContext);
@@ -181,11 +188,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Collections.singletonList("manager"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         try {
             int group = routingContext.getBodyAsJson().getInteger("group");
@@ -214,11 +223,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         try {
             int id = retrieveTLId(routingContext);
@@ -240,11 +251,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "observer"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         List<TrafficLight> tlList = service.getTLList();
         routingContext.response()
@@ -258,11 +271,13 @@ public class TLControllerVerticle extends AbstractVerticle {
             AuthorizationHandler.authenticateAndLogUser(routingContext);
         } catch (AuthenticationException e){
             routingContext.fail(401, e);
+            return;
         }
         final Set<String> acceptedRoles = new HashSet<>(Arrays.asList("manager", "ev"));
         if(!AuthorizationHandler.isAuthorized(routingContext, acceptedRoles)){
             logger.info("User is not authorized to access resource");
             routingContext.fail(403);
+            return;
         }
         try {
             int group = routingContext.getBodyAsJson().getInteger("group");
@@ -279,7 +294,7 @@ public class TLControllerVerticle extends AbstractVerticle {
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
                         .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
-            } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
+            } else if(roles.contains("ev") && color.equals(TLColor.GREEN) && IntrusionDetectionHandler.isHonest(AuthorizationHandler.getUsername(routingContext))){
                 if (service.changeToGreenOnEVRequest(id)){
                     routingContext.response()
                             .putHeader("content-type", "application/json; charset=utf-8")
