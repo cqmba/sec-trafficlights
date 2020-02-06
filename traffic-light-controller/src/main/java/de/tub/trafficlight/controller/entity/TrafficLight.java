@@ -63,4 +63,8 @@ public class TrafficLight {
         this.type = type;
         this.group = group;
     }
+
+    public static void resetCounter(){
+        COUNTER.set(0);
+    }
 }

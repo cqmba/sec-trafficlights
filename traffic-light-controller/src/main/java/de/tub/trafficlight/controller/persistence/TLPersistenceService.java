@@ -77,4 +77,6 @@ public interface TLPersistenceService {
      * @return The current Mode of the free TrafficLights.
      */
     TLMode getFreeTLMode();
+
+    void deletePreviousEntries();
 }

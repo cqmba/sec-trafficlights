@@ -63,4 +63,16 @@ public class AuthorizationHandler {
             return new HashSet<>();
         }
     }
+
+    public static String getUsername(RoutingContext routingContext){
+        MultiMap params = routingContext.request().params();
+        String tokenStr = params.get("token");
+        try {
+            AccessToken token = TokenVerifier.create(tokenStr, AccessToken.class).getToken();
+            return token.getPreferredUsername();
+        } catch (VerificationException | NullPointerException e) {
+            LogManager.getLogger().info("Client has no username associated");
+            return "";
+        }
+    }
 }

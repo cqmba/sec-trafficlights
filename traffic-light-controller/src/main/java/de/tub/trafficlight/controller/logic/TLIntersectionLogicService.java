@@ -53,4 +53,6 @@ public interface TLIntersectionLogicService {
      * @return current Intersection State
      */
     TLState getCurrentIntersectionState();
+
+    void resetIntersectionState();
 }

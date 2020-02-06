@@ -46,6 +46,7 @@ public class TLControllerServiceImpl implements TLControllerService {
      * Sets the first Timer and initializes the Intersection, then calls the periodic scheduling
      */
     private void startSchedule() {
+        persistence.deletePreviousEntries();
         List<TrafficLight> trafficLights = intersection.getTLList();
         try {
             if (trafficLights.size() != persistence.addTrafficLightList(trafficLights).size()) {
@@ -55,12 +56,7 @@ public class TLControllerServiceImpl implements TLControllerService {
         }catch (RuntimeException ex){
             logger.error(ex.getMessage());
         }
-        vertx.setTimer(25000, event -> {
-            intersection.doTransition();
-            persistence.updateTrafficLightList(intersection.getTLList());
-            logger.debug("Waiting for next Transition "+ intersection.getNextTransitionTimeMs() + "ms");
-            timePeriodic(intersection.getNextTransitionTimeMs());
-        });
+        timePeriodic(25000);
     }
 
 
@@ -107,8 +103,7 @@ public class TLControllerServiceImpl implements TLControllerService {
      * Makes an Intersection Transition, updates the states in the persistence and resets the timer
      */
     private void executeTransitionAndSetNewTimer(){
-        intersection.doTransition();
-        persistence.updateTrafficLightList(intersection.getTLList());
+        doTransition();
         int transitionMs = intersection.getNextTransitionTimeMs();
         logger.debug("Waiting for "+ transitionMs + "ms");
         timePeriodic(transitionMs);
@@ -194,5 +189,15 @@ public class TLControllerServiceImpl implements TLControllerService {
         }else {
             return persistence.switchModeOfFreeTLs(newMode);
         }
+    }
+
+    protected void resetIntersectionState() {
+        intersection.resetIntersectionState();
+        interrupt = true;
+    }
+
+    protected void doTransition(){
+        intersection.doTransition();
+        persistence.updateTrafficLightList(intersection.getTLList());
     }
 }
