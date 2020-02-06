@@ -1,6 +1,6 @@
 package de.tub.trafficlight.controller;
 
-import de.tub.trafficlight.controller.entity.TrafficLight;
+import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.security.IntrusionDetectionHandler;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
@@ -214,6 +214,81 @@ public class TLControllerVerticleTest {
         });
     }
 
+    @Test
+    public void testPostNewTrafficLightAsManagerReturns200(TestContext context){
+
+        final int expectedID = 12;
+        final TLColor expcolor = TLColor.YELLOW;
+        final TLPosition expposition = TLPosition.UNSPECIFIED;
+        final TLType exptype = TLType.PEDESTRIAN;
+        final int freeGroup = 2;
+
+        final Async async = context.async();
+
+        HttpRequest<Buffer> request = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.POST, 8086, "localhost", "/lights/"+expectedID);
+
+        JsonObject payload = new JsonObject().put("group", freeGroup).put("color", expcolor.toString()).put("position", expposition.toString()).put("type", exptype.toString());
+        request.addQueryParam("token", VALID_MANAGER_TOKEN);
+        request.putHeader("Content-Type", "application/json");
+        request.sendJsonObject(payload, ar -> {
+            if (ar.succeeded()){
+                HttpResponse<Buffer> result = ar.result();
+                context.assertTrue(result.statusCode() == 201);
+                //answer contains something
+                context.assertTrue(result.bodyAsString().contains("\"id\" : " + expectedID));
+                context.assertTrue(result.bodyAsString().contains("\"color\" : \""+expcolor.toString()));
+                context.assertTrue(result.bodyAsString().contains("\"position\" : \""+expposition.toString()));
+                context.assertTrue(result.bodyAsString().contains("\"type\" : \""+exptype.toString()));
+                async.complete();
+            } else {
+                context.fail();
+                async.complete();
+            }
+        });
+    }
+
+    @Test
+    public void testDeleteNewlyCreatedTrafficLightAsManagerReturns204(TestContext context){
+
+        final int expectedID = 13;
+        final TLColor expcolor = TLColor.YELLOW;
+        final TLPosition expposition = TLPosition.UNSPECIFIED;
+        final TLType exptype = TLType.PEDESTRIAN;
+        final int freeGroup = 2;
+
+        final Async async = context.async();
+
+        HttpRequest<Buffer> request = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.POST, 8086, "localhost", "/lights/"+expectedID);
+
+        JsonObject payload = new JsonObject().put("group", freeGroup).put("color", expcolor.toString()).put("position", expposition.toString()).put("type", exptype.toString());
+        request.addQueryParam("token", VALID_MANAGER_TOKEN);
+        request.putHeader("Content-Type", "application/json");
+        request.sendJsonObject(payload, ar -> {
+            if (ar.succeeded()){
+                HttpResponse<Buffer> result = ar.result();
+                context.assertTrue(result.statusCode() == 201);
+            } else {
+                context.fail();
+                async.complete();
+            }
+        });
+
+        WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.DELETE, 8086, "localhost", "/lights/"+expectedID)
+                .addQueryParam("token", VALID_MANAGER_TOKEN)
+                .send(ar -> {
+                    if (ar.succeeded()){
+                        context.assertTrue(ar.result().statusCode() == 204);
+                        async.complete();
+                    }else {
+                        context.fail();
+                        async.complete();
+                    }
+                });
+    }
+
     //EVTests
     @Test
     public void testChangeColorSuccessfullWhenAuthorizedAsEV(TestContext context){
@@ -373,5 +448,102 @@ public class TLControllerVerticleTest {
                         async.complete();
                     }
                 });
+    }
+
+    @Test
+    public void testObserverCanAccessGetTrafficLightGroup(TestContext context){
+
+        final int groupID = 1;
+        final Async async = context.async();
+
+        HttpRequest<Buffer> request = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.GET, 8086, "localhost", "/groups/"+groupID);
+
+        request.addQueryParam("token", VALID_OBSERVER_TOKEN)
+                .send( ar -> {
+                    if (ar.succeeded()){
+                        HttpResponse<Buffer> result = ar.result();
+                        context.assertTrue(result.statusCode() == 200);
+                        //answer contains something
+                        context.assertTrue(result.bodyAsString().contains("mode"));
+                        async.complete();
+                    } else {
+                        context.fail();
+                        async.complete();
+                    }
+                });
+    }
+
+    //Admin
+    @Test
+    public void testAdminCanChangeGroupModeToMaintenance(TestContext context){
+        final int groupID = 1;
+        final Async async = context.async();
+        final TLMode expectedMode = TLMode.MAINTENANCE;
+
+        HttpRequest<Buffer> request = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.PUT, 8086, "localhost", "/groups/"+groupID);
+
+        JsonObject payload = new JsonObject().put("mode", expectedMode.toString());
+
+        request.addQueryParam("token", VALID_ADMIN_TOKEN)
+                .sendJsonObject(payload, ar -> {
+                    if (ar.succeeded()){
+                        HttpResponse<Buffer> result = ar.result();
+                        context.assertTrue(result.statusCode() == 200);
+                        //answer contains something
+                        context.assertTrue(result.bodyAsString().contains(expectedMode.toString()));
+                        async.complete();
+                    } else {
+                        context.fail();
+                        async.complete();
+                    }
+                });
+    }
+
+    @Test
+    public void testAdminCanResetModeToScheduledAfterSwitchingToMaintenance(TestContext context){
+        final int groupID = 1;
+        final Async async = context.async();
+        final TLMode expectedMode = TLMode.MAINTENANCE;
+        final TLMode resetMode = TLMode.SCHEDULED;
+
+        HttpRequest<Buffer> request = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.PUT, 8086, "localhost", "/groups/"+groupID);
+
+        JsonObject payload = new JsonObject().put("mode", expectedMode.toString());
+
+        request.addQueryParam("token", VALID_ADMIN_TOKEN)
+                .sendJsonObject(payload, ar -> {
+                    if (ar.succeeded()){
+                        HttpResponse<Buffer> result = ar.result();
+                        context.assertTrue(result.statusCode() == 200);
+                        //answer contains something
+                        context.assertTrue(result.bodyAsString().contains(expectedMode.toString()));
+                    } else {
+                        context.fail();
+                        async.complete();
+                    }
+                });
+
+        HttpRequest<Buffer> resetReq = WebClient.create(vertx, validWebClientOptions)
+                .request(HttpMethod.PUT, 8086, "localhost", "/groups/"+groupID);
+
+        JsonObject resetPayload = new JsonObject().put("mode", resetMode.toString());
+
+        resetReq.addQueryParam("token", VALID_ADMIN_TOKEN)
+                .sendJsonObject(resetPayload, ar -> {
+                    if (ar.succeeded()){
+                        HttpResponse<Buffer> result = ar.result();
+                        context.assertTrue(result.statusCode() == 200);
+                        //answer contains something
+                        context.assertTrue(result.bodyAsString().contains(resetMode.toString()));
+                        async.complete();
+                    } else {
+                        context.fail();
+                        async.complete();
+                    }
+                });
+
     }
 }
