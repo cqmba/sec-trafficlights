@@ -4,6 +4,7 @@ import de.tub.trafficlight.controller.entity.*;
 import de.tub.trafficlight.controller.exception.AuthenticationException;
 import de.tub.trafficlight.controller.exception.BadRequestException;
 import de.tub.trafficlight.controller.security.AuthorizationHandler;
+import de.tub.trafficlight.controller.security.IntrusionDetectionHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
@@ -293,7 +294,7 @@ public class TLControllerVerticle extends AbstractVerticle {
                 routingContext.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
                         .end(Json.encodePrettily(service.changeToGenericColorOnManagerRequest(id, color)));
-            } else if(roles.contains("ev") && color.equals(TLColor.GREEN)){
+            } else if(roles.contains("ev") && color.equals(TLColor.GREEN) && IntrusionDetectionHandler.isHonest(AuthorizationHandler.getUsername(routingContext))){
                 if (service.changeToGreenOnEVRequest(id)){
                     routingContext.response()
                             .putHeader("content-type", "application/json; charset=utf-8")
